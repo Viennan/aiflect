@@ -4,24 +4,38 @@ import pytest
 
 from whero.vatbrain import (
     FilePreprocessConfig,
-    FilePurpose,
     FileResource,
     FileStatus,
     FileUploadRequest,
 )
 
 
-def test_file_upload_request_normalizes_purpose() -> None:
+def test_file_upload_request_accepts_preprocess_config() -> None:
     request = FileUploadRequest(
         file=b"hello",
         filename="hello.txt",
-        purpose="retrieval",
-        preprocess=FilePreprocessConfig(extract_text=True),
+        preprocess=FilePreprocessConfig(
+            video_fps=1.0,
+            provider_options={"video": {"mode": "sample"}},
+        ),
     )
 
-    assert request.purpose == FilePurpose.RETRIEVAL
     assert request.preprocess is not None
-    assert request.preprocess.extract_text is True
+    assert request.preprocess.video_fps == 1.0
+    assert request.preprocess.provider_options == {"video": {"mode": "sample"}}
+
+
+def test_file_upload_request_does_not_accept_purpose() -> None:
+    with pytest.raises(TypeError):
+        FileUploadRequest(file=b"hello", purpose="retrieval")  # type: ignore[call-arg]
+
+
+def test_file_preprocess_config_does_not_accept_other_options() -> None:
+    with pytest.raises(TypeError):
+        FilePreprocessConfig(extract_text=True)  # type: ignore[call-arg]
+
+    with pytest.raises(TypeError):
+        FilePreprocessConfig(image_detail="high")  # type: ignore[call-arg]
 
 
 def test_file_upload_request_requires_file_reference() -> None:
@@ -34,11 +48,12 @@ def test_file_resource_normalizes_status_and_requires_identity() -> None:
         id="file_1",
         provider="volcengine",
         status="ready",
-        purpose="media",
     )
 
     assert resource.status == FileStatus.READY
-    assert resource.purpose == FilePurpose.MEDIA
 
     with pytest.raises(ValueError):
         FileResource(id="", provider="volcengine")
+
+    with pytest.raises(TypeError):
+        FileResource(id="file_1", provider="volcengine", purpose="media")  # type: ignore[call-arg]

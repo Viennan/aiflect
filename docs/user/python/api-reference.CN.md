@@ -1,12 +1,12 @@
 # Python API 参考
 
-状态：v0.3
+状态：v0.4
 日期：2026-05-13
-最近更新：2026-05-13
+最近更新：2026-05-28
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.3 已暴露给用户的主要接口、数据结构和当前 OpenAI adapter 支持范围。渐进式使用流程见 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.4 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)；Volcengine provider 用法见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 
@@ -27,6 +27,7 @@ Provider client 从各 provider 包导入：
 
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
+from whero.vatbrain.providers.volcengine import VolcengineClient
 ```
 
 Pydantic structured output helper 从 `whero.vatbrain.structured` 导入：
@@ -63,7 +64,7 @@ config = ClientConfig(
 
 ### OpenAIClient
 
-当前已实现 provider：OpenAI。
+当前已实现 provider：OpenAI、Volcengine。
 
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
@@ -96,6 +97,61 @@ OpenAI client 方法：
 - `agenerate_parsed(...) -> ParsedGenerationResponse`
 - `embed(...) -> EmbeddingResponse`
 - `aembed(...) -> EmbeddingResponse`
+- `get_adapter_capability() -> AdapterCapability`
+- `get_model_capability(model, overrides=None) -> ModelCapability`
+
+### VolcengineClient
+
+Volcengine provider 使用火山方舟 Ark SDK 原生接口，不使用 OpenAI-compatible SDK surface。
+
+```python
+from whero.vatbrain.providers.volcengine import VolcengineClient
+
+client = VolcengineClient()
+```
+
+Volcengine API key 可通过 `ENV_VATBRAIN_VOLCENGINE_API_KEY` 提供，也可在初始化时传入：
+
+```python
+client = VolcengineClient(api_key="...", base_url="...", timeout=30.0)
+```
+
+安装 extra：
+
+```bash
+cd python
+.venv/bin/python -m pip install -e ".[volcengine]"
+```
+
+初始化参数：
+
+- `config`：`ClientConfig`。
+- `api_key`、`base_url`、`timeout`、`max_retries`：覆盖 `config` 中的同名字段。
+- `client`：注入已有同步 Ark SDK client，常用于测试或复用连接。
+- `async_client`：注入已有异步 Ark SDK client。
+- `model_capability_overrides`：用户侧模型能力覆写。
+- `**ark_client_options`：透传给 Ark SDK client 的初始化参数，例如 `ak`、`sk`、`region` 等。
+
+Volcengine client 方法：
+
+- `generate(...) -> GenerationResponse`
+- `agenerate(...) -> GenerationResponse`
+- `stream_generate(...) -> Iterator[GenerationStreamEvent]`
+- `astream_generate(...) -> AsyncIterator[GenerationStreamEvent]`
+- `generate_parsed(...) -> ParsedGenerationResponse`
+- `agenerate_parsed(...) -> ParsedGenerationResponse`
+- `embed(...) -> EmbeddingResponse`
+- `aembed(...) -> EmbeddingResponse`
+- `upload_file(...) -> FileResource`
+- `aupload_file(...) -> FileResource`
+- `retrieve_file(file_id, ...) -> FileResource`
+- `aretrieve_file(file_id, ...) -> FileResource`
+- `list_files(...) -> tuple[FileResource, ...]`
+- `alist_files(...) -> tuple[FileResource, ...]`
+- `delete_file(file_id, ...) -> FileResource`
+- `adelete_file(file_id, ...) -> FileResource`
+- `wait_for_file_processing(file_id, ...) -> FileResource`
+- `await_file_processing(file_id, ...) -> FileResource`
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
@@ -177,7 +233,7 @@ VideoPart(file_id="file_video_123", provider="volcengine")
 FilePart(local_path="./contract.pdf", mime_type="application/pdf")
 ```
 
-`local_path` 只是 metadata，不会自动读取或上传文件。需要 provider 文件资源时，应使用对应 provider adapter 的显式 file/resource API；v0.3 core 已有资源模型，但 OpenAI adapter 尚未暴露文件管理方法。
+`local_path` 只是 metadata，不会自动读取或上传文件。需要 provider 文件资源时，应使用对应 provider adapter 的显式 file/resource API。OpenAI adapter 尚未暴露文件管理方法；Volcengine adapter 已支持 Ark Files API。
 
 ### FunctionCallItem
 
@@ -339,7 +395,6 @@ config = GenerationConfig(
     temperature=0.2,
     top_p=0.9,
     max_output_tokens=300,
-    stop=["END"],
 )
 ```
 
@@ -380,7 +435,7 @@ reasoning = ReasoningConfig(
 )
 ```
 
-不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。
+不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。Volcengine adapter 将 `mode` 映射为 Ark `thinking.type`，将 `effort` 映射为 `reasoning.effort`。
 
 ### ToolCallConfig
 
@@ -452,7 +507,7 @@ from whero.vatbrain import StreamOptions
 stream_options = StreamOptions(include_usage=True)
 ```
 
-这是通用 core 字段；OpenAI Responses API 当前不会把它映射为 `stream_options.include_usage`。
+这是通用 core 字段；OpenAI / Volcengine Responses API 当前不会把它映射为 provider 的 `stream_options.include_usage`。
 
 同步流式：
 
@@ -565,7 +620,7 @@ tool = ToolSpec(
 )
 ```
 
-OpenAI adapter 将其映射为 OpenAI custom tool。模型输出仍是 `FunctionCallItem`，但 `type == "custom"` 且 raw input 位于 `input` 字段。回填结果时使用 `FunctionResultItem(tool_type="custom")`。
+OpenAI adapter 将其映射为 OpenAI custom tool。Volcengine adapter v0.4 不支持 custom tool，只支持普通 function tool。模型输出仍是 `FunctionCallItem`，但 OpenAI custom tool 的 `type == "custom"` 且 raw input 位于 `input` 字段。回填结果时使用 `FunctionResultItem(tool_type="custom")`。
 
 ## Structured Output
 
@@ -643,16 +698,17 @@ response = await client.aembed(
 )
 ```
 
-OpenAI adapter 当前只支持文本 embedding。Core 已能表达多模态 embedding、instructions 和 sparse vectors，这些能力主要服务后续 provider adapter。
+OpenAI adapter 支持文本 embedding。Volcengine adapter 支持多模态 embedding、instructions、dimensions、encoding_format 与 sparse vectors。
 
 ### EmbeddingInput
 
 ```python
-from whero.vatbrain import EmbeddingInput, ImagePart, MessageItem
+from whero.vatbrain import EmbeddingInput, ImagePart, MessageItem, TextPart
 
 EmbeddingInput.text("hello")
 EmbeddingInput.from_message(MessageItem.user("hello"))
 EmbeddingInput([ImagePart(url="https://example.test/image.png")], modality="image")
+EmbeddingInput([TextPart("blue sky"), ImagePart(url="https://example.test/image.png")])
 ```
 
 字段：
@@ -699,25 +755,47 @@ vector = EmbeddingVector(index=0, dense=[0.1, 0.2], sparse=sparse)
 - `metadata`
 - `raw`
 
+Volcengine 多模态 embedding 每次 request 只提交一个 `EmbeddingInput`；该 input 内部可以混合 text/image/video parts。Ark API 一次返回一个向量，如需多个样本，请在用户代码中循环调用。
+
 ## Resources
 
-v0.3 已定义 resource/file core 模型，但当前 OpenAI adapter 尚未暴露文件资源方法。后续 provider adapter 可使用这些模型实现 file API。
+v0.3 已定义 resource/file core 模型。OpenAI adapter 尚未暴露文件资源方法；Volcengine adapter 已实现 Ark Files API。
 
 ### FileUploadRequest
 
 ```python
-from whero.vatbrain import FilePurpose, FilePreprocessConfig, FileUploadRequest
+from whero.vatbrain import FilePreprocessConfig, FileUploadRequest
 
 request = FileUploadRequest(
     file="./demo.mp4",
     filename="demo.mp4",
-    purpose=FilePurpose.MEDIA,
     mime_type="video/mp4",
     preprocess=FilePreprocessConfig(video_fps=1.0),
 )
 ```
 
 `FileUploadRequest.file` 可以是 bytes、字符串路径、`PathLike` 或 provider adapter 支持的文件对象。Core 不执行本地 I/O。
+
+`FilePreprocessConfig` 只包含：
+
+- `video_fps`：视频文件预处理抽帧帧率提示。
+- `provider_options`：provider-native 预处理参数。
+
+Volcengine client 可直接调用文件方法：
+
+```python
+from whero.vatbrain import FilePreprocessConfig
+
+file = volcengine_client.upload_file(
+    file="demo.mp4",
+    filename="demo.mp4",
+    purpose="user_data",
+    mime_type="video/mp4",
+    preprocess=FilePreprocessConfig(video_fps=0.3),
+)
+
+ready_file = volcengine_client.wait_for_file_processing(file.id)
+```
 
 ### FileResource
 
@@ -735,11 +813,12 @@ resource = FileResource(
 相关枚举：
 
 - `FileStatus`：`uploaded`、`processing`、`ready`、`failed`、`deleted`、`expired`、`unknown`。
-- `FilePurpose`：`assistants`、`batch`、`fine_tune`、`vision`、`retrieval`、`media`、`other`。
+
+Core 不定义文件 purpose 通用枚举，`FileUploadRequest` / `FileResource` 也不包含 normalized purpose 字段。Volcengine Ark 原生 purpose `user_data` 是 adapter 级字符串参数，返回原始值保存在 `FileResource.metadata["raw_purpose"]`。
 
 ## Media
 
-v0.3 已定义 media generation core 模型，但当前 OpenAI adapter 尚未暴露 image/video generation 方法。
+v0.3 已定义 media generation core 模型，但当前 OpenAI / Volcengine adapter 尚未暴露 image/video generation 方法。
 
 ### MediaArtifact
 
@@ -1004,5 +1083,40 @@ from whero.vatbrain.core.errors import (
 - provider conversation 持久化上下文抽象。
 - OpenAI 文件资源管理方法。
 - 多模态 embedding。
+- image/video generation 方法。
+- 跨 provider replay。
+
+## Volcengine Adapter 支持范围
+
+当前 Volcengine adapter 支持：
+
+- Ark SDK-only 调用路径。
+- Responses API generation。
+- Responses API streaming。
+- text/image/video/file input。
+- JSON Schema structured output。
+- Pydantic structured output helper。
+- `ReasoningConfig.mode -> thinking.type`。
+- `ReasoningConfig.effort -> reasoning.effort`。
+- user function tool。
+- function call result 回填。
+- `previous_response_id` / `store` remote context hint。
+- 基于 `covered_item_count` 的 previous response 差分传输。
+- previous response 失效时的显式 fallback replay。
+- provider-native item snapshot replay。
+- Files API upload/retrieve/list/delete/wait。
+- 多模态 embedding、instructions、dense/sparse vector。
+- adapter/model capability 查询与用户覆写。
+
+当前 Volcengine adapter 不支持：
+
+- OpenAI-compatible SDK surface。
+- Chat Completions fallback。
+- 停止序列的 normalized 映射。
+- 自动工具执行。
+- custom tool。
+- provider-hosted tools、remote tools、MCP tools 的稳定通用抽象。
+- provider conversation 持久化上下文抽象。
+- 本地文件隐式上传。
 - image/video generation 方法。
 - 跨 provider replay。

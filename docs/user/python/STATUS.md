@@ -1,13 +1,14 @@
 # Python 用户文档状态
 
-状态：v0.3 已系统化整理
+状态：v0.4 已系统化整理
 日期：2026-05-05
-最近更新：2026-05-13
+最近更新：2026-05-28
 
 ## 当前文档
 
 - [user/python/quickstart.CN.md](user/python/quickstart.CN.md)：渐进式用户指南，从安装、client 初始化、generation、remote context/replay、streaming、structured output、tools、embedding、capability 到错误处理。
 - [user/python/api-reference.CN.md](user/python/api-reference.CN.md)：Python public API 参考，覆盖当前暴露给用户的 core dataclass、enum、provider client、Pydantic helper、capability、usage 与错误类型。
+- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，覆盖 Ark SDK-only 安装、generation、streaming、Files API、多模态 embedding、function tools、remote context 与限制。
 - [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)：Pydantic structured output 编程模型，说明 helper、默认 schema 行为、strict schema、解析与错误处理。
 
 ## 已覆盖
@@ -18,6 +19,19 @@
   - 同步/异步 generation。
   - 同步/异步 streaming。
   - 同步/异步 embedding。
+  - capability 查询。
+- Volcengine provider client：
+  - `whero-vatbrain[volcengine]` optional dependency。
+  - `ENV_VATBRAIN_VOLCENGINE_API_KEY`。
+  - Ark SDK-only 调用边界。
+  - 同步/异步 generation 与 streaming。
+  - Responses API text/image/video/file input。
+  - JSON Schema structured output。
+  - reasoning config 与 reasoning summary stream event。
+  - user-executed function tools。
+  - Files API upload/retrieve/list/delete/wait。
+  - 多模态 embedding、instructions、dense/sparse vector。
+  - provider-native replay 与 previous response 差分传输。
   - capability 查询。
 - Generation：
   - Full-context First 编程模型。
@@ -44,15 +58,17 @@
   - 空 `parameters_schema` 与 custom tool 的区别。
 - Embedding：
   - OpenAI text embedding。
-  - v0.3 core 多模态/sparse embedding 表达边界。
+  - Volcengine multimodal embedding。
+  - v0.4 core 多模态/sparse embedding 表达边界。
 - Core models：
   - `MessageItem`、content parts、function call/result、reasoning item。
   - resources/file 模型。
   - media artifact/task 模型。
   - usage、capability、errors。
 - 限制：
-  - 仅 OpenAI provider。
+  - 已实现 OpenAI 与 Volcengine provider。
   - OpenAI generation 仅 Responses API。
+  - Volcengine generation 仅 Ark SDK Responses API，不使用 OpenAI-compatible surface。
   - 不自动工具执行。
   - 不暴露 provider-hosted/remote/MCP tool 的通用抽象。
   - 不暴露 provider conversation 持久化上下文抽象。
@@ -69,7 +85,6 @@
 
 ## 待完善
 
-- Volcengine adapter 用户指南。
 - Provider capability matrix。
 - 可选真实 API 调用示例。
 - 更系统的错误处理 cookbook。

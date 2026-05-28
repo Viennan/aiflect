@@ -21,25 +21,11 @@ class FileStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
-class FilePurpose(StrEnum):
-    """Provider file purpose."""
-
-    ASSISTANTS = "assistants"
-    BATCH = "batch"
-    FINE_TUNE = "fine_tune"
-    VISION = "vision"
-    RETRIEVAL = "retrieval"
-    MEDIA = "media"
-    OTHER = "other"
-
-
 @dataclass(frozen=True, slots=True)
 class FilePreprocessConfig:
     """Optional provider-side file preprocessing hints."""
 
     video_fps: float | None = None
-    image_detail: str | None = None
-    extract_text: bool | None = None
     provider_options: dict[str, Any] = field(default_factory=dict)
 
 
@@ -49,7 +35,6 @@ class FileUploadRequest:
 
     file: bytes | str | PathLike[str] | Any
     filename: str | None = None
-    purpose: FilePurpose | str | None = None
     mime_type: str | None = None
     preprocess: FilePreprocessConfig | None = None
     provider_options: dict[str, Any] = field(default_factory=dict)
@@ -58,8 +43,6 @@ class FileUploadRequest:
     def __post_init__(self) -> None:
         if self.file is None:
             raise ValueError("FileUploadRequest.file is required.")
-        if self.purpose is not None and not isinstance(self.purpose, FilePurpose):
-            object.__setattr__(self, "purpose", FilePurpose(self.purpose))
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +52,6 @@ class FileResource:
     id: str
     provider: str
     filename: str | None = None
-    purpose: FilePurpose | str | None = None
     mime_type: str | None = None
     bytes: int | None = None
     status: FileStatus | str = FileStatus.UNKNOWN
@@ -84,7 +66,5 @@ class FileResource:
             raise ValueError("FileResource.id is required.")
         if not self.provider:
             raise ValueError("FileResource.provider is required.")
-        if self.purpose is not None and not isinstance(self.purpose, FilePurpose):
-            object.__setattr__(self, "purpose", FilePurpose(self.purpose))
         if not isinstance(self.status, FileStatus):
             object.__setattr__(self, "status", FileStatus(self.status))

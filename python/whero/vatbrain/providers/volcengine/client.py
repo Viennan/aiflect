@@ -1,0 +1,793 @@
+"""Volcengine Ark provider client."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Iterator, Mapping
+import os
+from typing import Any
+
+from whero.vatbrain.core.capabilities import AdapterCapability, ModelCapability
+from whero.vatbrain.core.client import ClientConfig
+from whero.vatbrain.core.embeddings import EmbeddingInput, EmbeddingRequest, EmbeddingResponse
+from whero.vatbrain.core.errors import ProviderRequestError
+from whero.vatbrain.core.generation import (
+    GenerationConfig,
+    GenerationRequest,
+    GenerationResponse,
+    GenerationStreamEvent,
+    ReasoningConfig,
+    RemoteContextHint,
+    RemoteContextInvalidBehavior,
+    ReplayPolicy,
+    ResponseFormat,
+    StreamOptions,
+    ToolCallConfig,
+)
+from whero.vatbrain.core.items import Item
+from whero.vatbrain.core.resources import (
+    FilePreprocessConfig,
+    FileResource,
+    FileUploadRequest,
+)
+from whero.vatbrain.core.tools import ToolSpec
+from whero.vatbrain.providers.volcengine.capabilities import (
+    get_adapter_capability,
+    get_model_capability,
+)
+from whero.vatbrain.providers.volcengine.embeddings import (
+    from_volcengine_embedding_response,
+    to_volcengine_embedding_params,
+)
+from whero.vatbrain.providers.volcengine.files import (
+    from_volcengine_file_delete_response,
+    from_volcengine_file_resource,
+    to_volcengine_file_create_params,
+    to_volcengine_file_list_params,
+)
+from whero.vatbrain.providers.volcengine.mapper import (
+    PROVIDER,
+    from_volcengine_generation_response,
+    to_volcengine_generation_params,
+)
+from whero.vatbrain.providers.volcengine.stream import from_volcengine_stream_event
+from whero.vatbrain.structured import ParsedGenerationResponse, pydantic_output
+
+
+class VolcengineClient:
+    """Provider-level Volcengine Ark adapter client."""
+
+    provider = PROVIDER
+    api_key_env_var = "ENV_VATBRAIN_VOLCENGINE_API_KEY"
+
+    def __init__(
+        self,
+        *,
+        config: ClientConfig | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+        client: Any | None = None,
+        async_client: Any | None = None,
+        model_capability_overrides: Mapping[str, Mapping[str, Any]] | None = None,
+        **ark_client_options: Any,
+    ) -> None:
+        self._client = client
+        self._async_client = async_client
+        self._client_options = _merge_client_options(
+            config=config,
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            provider_options=ark_client_options,
+        )
+        self._model_capability_overrides = {
+            model: dict(values)
+            for model, values in (model_capability_overrides or {}).items()
+        }
+
+    def generate(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        response_format: ResponseFormat | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> GenerationResponse:
+        request = GenerationRequest(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        response = self._create_generation_response(
+            request,
+            message="Volcengine generation request failed.",
+        )
+        return from_volcengine_generation_response(response)
+
+    def generate_parsed(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        output_type: Any,
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ParsedGenerationResponse[Any]:
+        output_spec = pydantic_output(output_type)
+        response = self.generate(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=output_spec.response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        return output_spec.parse_response(response)
+
+    async def agenerate(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        response_format: ResponseFormat | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> GenerationResponse:
+        request = GenerationRequest(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        response = await self._acreate_generation_response(
+            request,
+            message="Volcengine async generation request failed.",
+        )
+        return from_volcengine_generation_response(response)
+
+    async def agenerate_parsed(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        output_type: Any,
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ParsedGenerationResponse[Any]:
+        output_spec = pydantic_output(output_type)
+        response = await self.agenerate(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=output_spec.response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        return output_spec.parse_response(response)
+
+    def stream_generate(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        response_format: ResponseFormat | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        stream_options: StreamOptions | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> Iterator[GenerationStreamEvent]:
+        request = GenerationRequest(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            stream_options=stream_options,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        stream = self._create_generation_stream(
+            request,
+            message="Volcengine stream generation request failed.",
+        )
+        for sequence, event in enumerate(stream):
+            yield from_volcengine_stream_event(event, sequence=sequence)
+
+    async def astream_generate(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        response_format: ResponseFormat | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        stream_options: StreamOptions | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> AsyncIterator[GenerationStreamEvent]:
+        request = GenerationRequest(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            stream_options=stream_options,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        stream = await self._acreate_generation_stream(
+            request,
+            message="Volcengine async stream generation request failed.",
+        )
+        sequence = 0
+        async for event in stream:
+            yield from_volcengine_stream_event(event, sequence=sequence)
+            sequence += 1
+
+    def embed(
+        self,
+        *,
+        model: str,
+        inputs: list[EmbeddingInput | str] | tuple[EmbeddingInput | str, ...],
+        instructions: str | None = None,
+        dimensions: int | None = None,
+        encoding_format: str | None = None,
+        sparse_embedding: bool | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> EmbeddingResponse:
+        request = EmbeddingRequest(
+            model=model,
+            inputs=inputs,
+            instructions=instructions,
+            dimensions=dimensions,
+            encoding_format=encoding_format,
+            sparse_embedding=sparse_embedding,
+            provider_options=provider_options,
+        )
+        params = to_volcengine_embedding_params(request)
+        try:
+            response = self._sync_client.multimodal_embeddings.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine embedding request failed.",
+                "multimodal_embeddings.create",
+                exc,
+            ) from exc
+        return from_volcengine_embedding_response(response)
+
+    async def aembed(
+        self,
+        *,
+        model: str,
+        inputs: list[EmbeddingInput | str] | tuple[EmbeddingInput | str, ...],
+        instructions: str | None = None,
+        dimensions: int | None = None,
+        encoding_format: str | None = None,
+        sparse_embedding: bool | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> EmbeddingResponse:
+        request = EmbeddingRequest(
+            model=model,
+            inputs=inputs,
+            instructions=instructions,
+            dimensions=dimensions,
+            encoding_format=encoding_format,
+            sparse_embedding=sparse_embedding,
+            provider_options=provider_options,
+        )
+        params = to_volcengine_embedding_params(request)
+        try:
+            response = await self._async_ark_client.multimodal_embeddings.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async embedding request failed.",
+                "multimodal_embeddings.create",
+                exc,
+            ) from exc
+        return from_volcengine_embedding_response(response)
+
+    def upload_file(
+        self,
+        *,
+        file: Any,
+        filename: str | None = None,
+        purpose: str | None = None,
+        mime_type: str | None = None,
+        preprocess: FilePreprocessConfig | None = None,
+        expire_at: int | None = None,
+        provider_options: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> FileResource:
+        request = FileUploadRequest(
+            file=file,
+            filename=filename,
+            mime_type=mime_type,
+            preprocess=preprocess,
+            provider_options=_file_provider_options(purpose, expire_at, provider_options),
+            metadata=metadata or {},
+        )
+        params = to_volcengine_file_create_params(request)
+        try:
+            response = self._sync_client.files.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine file upload request failed.",
+                "files.create",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    async def aupload_file(
+        self,
+        *,
+        file: Any,
+        filename: str | None = None,
+        purpose: str | None = None,
+        mime_type: str | None = None,
+        preprocess: FilePreprocessConfig | None = None,
+        expire_at: int | None = None,
+        provider_options: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> FileResource:
+        request = FileUploadRequest(
+            file=file,
+            filename=filename,
+            mime_type=mime_type,
+            preprocess=preprocess,
+            provider_options=_file_provider_options(purpose, expire_at, provider_options),
+            metadata=metadata or {},
+        )
+        params = to_volcengine_file_create_params(request)
+        try:
+            response = await self._async_ark_client.files.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async file upload request failed.",
+                "files.create",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    def retrieve_file(
+        self,
+        file_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> FileResource:
+        try:
+            response = self._sync_client.files.retrieve(file_id, **dict(provider_options or {}))
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine file retrieve request failed.",
+                "files.retrieve",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    async def aretrieve_file(
+        self,
+        file_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> FileResource:
+        try:
+            response = await self._async_ark_client.files.retrieve(file_id, **dict(provider_options or {}))
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async file retrieve request failed.",
+                "files.retrieve",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    def list_files(
+        self,
+        *,
+        purpose: str | None = None,
+        limit: int | None = None,
+        after: str | None = None,
+        order: str | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> tuple[FileResource, ...]:
+        params = to_volcengine_file_list_params(
+            purpose=purpose,
+            limit=limit,
+            after=after,
+            order=order,
+            provider_options=provider_options,
+        )
+        try:
+            page = self._sync_client.files.list(**params)
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine file list request failed.",
+                "files.list",
+                exc,
+            ) from exc
+        return tuple(from_volcengine_file_resource(item) for item in _iter_page_items(page))
+
+    async def alist_files(
+        self,
+        *,
+        purpose: str | None = None,
+        limit: int | None = None,
+        after: str | None = None,
+        order: str | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> tuple[FileResource, ...]:
+        params = to_volcengine_file_list_params(
+            purpose=purpose,
+            limit=limit,
+            after=after,
+            order=order,
+            provider_options=provider_options,
+        )
+        try:
+            page = self._async_ark_client.files.list(**params)
+            resources = []
+            async for item in page:
+                resources.append(from_volcengine_file_resource(item))
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async file list request failed.",
+                "files.list",
+                exc,
+            ) from exc
+        return tuple(resources)
+
+    def delete_file(
+        self,
+        file_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> FileResource:
+        try:
+            response = self._sync_client.files.delete(file_id, **dict(provider_options or {}))
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine file delete request failed.",
+                "files.delete",
+                exc,
+            ) from exc
+        return from_volcengine_file_delete_response(response, file_id=file_id)
+
+    async def adelete_file(
+        self,
+        file_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> FileResource:
+        try:
+            response = await self._async_ark_client.files.delete(file_id, **dict(provider_options or {}))
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async file delete request failed.",
+                "files.delete",
+                exc,
+            ) from exc
+        return from_volcengine_file_delete_response(response, file_id=file_id)
+
+    def wait_for_file_processing(
+        self,
+        file_id: str,
+        *,
+        poll_interval: float = 3.0,
+        max_wait_seconds: float = 600.0,
+    ) -> FileResource:
+        try:
+            response = self._sync_client.files.wait_for_processing(
+                file_id,
+                poll_interval=poll_interval,
+                max_wait_seconds=max_wait_seconds,
+            )
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine wait-for-file-processing request failed.",
+                "files.wait_for_processing",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    async def await_file_processing(
+        self,
+        file_id: str,
+        *,
+        poll_interval: float = 3.0,
+        max_wait_seconds: float = 600.0,
+    ) -> FileResource:
+        try:
+            response = await self._async_ark_client.files.wait_for_processing(
+                file_id,
+                poll_interval=poll_interval,
+                max_wait_seconds=max_wait_seconds,
+            )
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async wait-for-file-processing request failed.",
+                "files.wait_for_processing",
+                exc,
+            ) from exc
+        return from_volcengine_file_resource(response)
+
+    async def await_for_file_processing(
+        self,
+        file_id: str,
+        *,
+        poll_interval: float = 3.0,
+        max_wait_seconds: float = 600.0,
+    ) -> FileResource:
+        return await self.await_file_processing(
+            file_id,
+            poll_interval=poll_interval,
+            max_wait_seconds=max_wait_seconds,
+        )
+
+    def get_adapter_capability(self) -> AdapterCapability:
+        return get_adapter_capability()
+
+    def get_model_capability(
+        self,
+        model: str,
+        *,
+        overrides: Mapping[str, Any] | None = None,
+    ) -> ModelCapability:
+        merged_overrides = dict(self._model_capability_overrides.get(model, {}))
+        if overrides:
+            merged_overrides.update(dict(overrides))
+        return get_model_capability(model, overrides=merged_overrides or None)
+
+    def _create_generation_response(self, request: GenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_generation_params(request)
+        try:
+            return self._sync_client.responses.create(**params)
+        except Exception as exc:
+            if not _should_replay_without_remote_context(request, exc):
+                raise _provider_request_error(message, "responses.create", exc) from exc
+            retry_params = to_volcengine_generation_params(request, use_remote_context=False)
+            try:
+                return self._sync_client.responses.create(**retry_params)
+            except Exception as retry_exc:
+                raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
+
+    async def _acreate_generation_response(self, request: GenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_generation_params(request)
+        try:
+            return await self._async_ark_client.responses.create(**params)
+        except Exception as exc:
+            if not _should_replay_without_remote_context(request, exc):
+                raise _provider_request_error(message, "responses.create", exc) from exc
+            retry_params = to_volcengine_generation_params(request, use_remote_context=False)
+            try:
+                return await self._async_ark_client.responses.create(**retry_params)
+            except Exception as retry_exc:
+                raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
+
+    def _create_generation_stream(self, request: GenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_generation_params(request, stream=True)
+        try:
+            return self._sync_client.responses.create(**params)
+        except Exception as exc:
+            if not _should_replay_without_remote_context(request, exc):
+                raise _provider_request_error(message, "responses.create", exc) from exc
+            retry_params = to_volcengine_generation_params(request, stream=True, use_remote_context=False)
+            try:
+                return self._sync_client.responses.create(**retry_params)
+            except Exception as retry_exc:
+                raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
+
+    async def _acreate_generation_stream(self, request: GenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_generation_params(request, stream=True)
+        try:
+            return await self._async_ark_client.responses.create(**params)
+        except Exception as exc:
+            if not _should_replay_without_remote_context(request, exc):
+                raise _provider_request_error(message, "responses.create", exc) from exc
+            retry_params = to_volcengine_generation_params(request, stream=True, use_remote_context=False)
+            try:
+                return await self._async_ark_client.responses.create(**retry_params)
+            except Exception as retry_exc:
+                raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
+
+    @property
+    def _sync_client(self) -> Any:
+        if self._client is None:
+            from volcenginesdkarkruntime import Ark
+
+            self._client = Ark(**self._client_options)
+        return self._client
+
+    @property
+    def _async_ark_client(self) -> Any:
+        if self._async_client is None:
+            from volcenginesdkarkruntime import AsyncArk
+
+            self._async_client = AsyncArk(**self._client_options)
+        return self._async_client
+
+
+def _merge_client_options(
+    *,
+    config: ClientConfig | None,
+    api_key: str | None,
+    base_url: str | None,
+    timeout: float | None,
+    max_retries: int | None,
+    provider_options: Mapping[str, Any],
+) -> dict[str, Any]:
+    options: dict[str, Any] = dict(config.provider_options or {}) if config else {}
+    options.update(provider_options)
+    resolved_api_key = api_key if api_key is not None else (config.api_key if config else None)
+    if resolved_api_key is None:
+        resolved_api_key = os.getenv(VolcengineClient.api_key_env_var)
+    resolved_base_url = base_url if base_url is not None else (config.base_url if config else None)
+    resolved_timeout = timeout if timeout is not None else (config.timeout if config else None)
+    resolved_max_retries = max_retries if max_retries is not None else (config.max_retries if config else None)
+    if resolved_api_key is not None:
+        options["api_key"] = resolved_api_key
+    if resolved_base_url is not None:
+        options["base_url"] = resolved_base_url
+    if resolved_timeout is not None:
+        options["timeout"] = resolved_timeout
+    if resolved_max_retries is not None:
+        options["max_retries"] = resolved_max_retries
+    return options
+
+
+def _provider_request_error(message: str, operation: str, exc: BaseException) -> ProviderRequestError:
+    body = _get_error_body(exc)
+    error_payload = _get_error_payload(body)
+    return ProviderRequestError(
+        message,
+        provider=PROVIDER,
+        operation=operation,
+        status_code=_get_attr(exc, "status_code", None),
+        request_id=_get_attr(exc, "request_id", _get_attr(exc, "x_request_id", None)),
+        error_type=_get_attr(error_payload, "type", None),
+        error_code=_get_attr(error_payload, "code", None),
+        error_param=_get_attr(error_payload, "param", None),
+        raw=body,
+        cause=exc,
+    )
+
+
+def _should_replay_without_remote_context(request: GenerationRequest, exc: BaseException) -> bool:
+    if request.remote_context is None or request.remote_context.previous_response_id is None:
+        return False
+    if request.replay_policy is None:
+        return False
+    if request.replay_policy.on_remote_context_invalid != RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT:
+        return False
+    return _is_remote_context_invalid_error(exc)
+
+
+def _is_remote_context_invalid_error(exc: BaseException) -> bool:
+    body = _get_error_body(exc)
+    error_payload = _get_error_payload(body)
+    error_param = str(_get_attr(error_payload, "param", "") or "").lower()
+    if error_param in {"previous_response_id", "previous_response"}:
+        return True
+    haystack = " ".join(
+        str(value or "").lower()
+        for value in (
+            _get_attr(error_payload, "code", None),
+            _get_attr(error_payload, "type", None),
+            _get_attr(error_payload, "message", None),
+            _get_attr(exc, "message", None),
+            str(exc),
+        )
+    )
+    return (
+        "previous_response_id" in haystack
+        or "previous response" in haystack
+        or ("response" in haystack and "expired" in haystack)
+        or ("context" in haystack and "expired" in haystack)
+        or ("context" in haystack and "invalid" in haystack)
+    )
+
+
+def _file_provider_options(
+    purpose: str | None,
+    expire_at: int | None,
+    provider_options: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    options = dict(provider_options or {})
+    if purpose is not None:
+        options.setdefault("purpose", purpose)
+    if expire_at is not None:
+        options.setdefault("expire_at", expire_at)
+    return options
+
+
+def _iter_page_items(page: Any) -> Iterator[Any]:
+    if isinstance(page, (list, tuple)):
+        yield from page
+        return
+    data = _get_attr(page, "data", None)
+    if isinstance(data, (list, tuple)):
+        yield from data
+        return
+    yield from page
+
+
+def _get_error_body(exc: BaseException) -> Any:
+    body = _get_attr(exc, "body", None)
+    if body is not None:
+        return body
+    response = _get_attr(exc, "response", None)
+    if response is not None:
+        try:
+            return response.json()
+        except Exception:
+            return response
+    return None
+
+
+def _get_error_payload(body: Any) -> Any:
+    if isinstance(body, Mapping):
+        return body.get("error", body)
+    return body
+
+
+def _get_attr(obj: Any, name: str, default: Any = None) -> Any:
+    if obj is None:
+        return default
+    if isinstance(obj, Mapping):
+        return obj.get(name, default)
+    return getattr(obj, name, default)

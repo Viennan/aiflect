@@ -123,7 +123,7 @@ provider_options
 
 其中：
 
-- `generation_config` 承载 temperature、top_p、max_output_tokens、stop 等通用生成参数。
+- `generation_config` 承载 temperature、top_p、max_output_tokens 等通用生成参数。
 - `reasoning` 承载 reasoning effort、budget tokens、summary、include trace 等通用推理配置。
 - `tool_call_config` 承载 parallel tool calls、tool choice 等通用工具调用行为配置。
 - `provider_options` 只承载 OpenAI 专有或暂时未归一化的参数。

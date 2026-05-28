@@ -1,12 +1,12 @@
 # Python 快速开始
 
-状态：v0.3
+状态：v0.4
 日期：2026-05-05
-最近更新：2026-05-13
+最近更新：2026-05-28
 
 ## 读者路径
 
-本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI adapter 支持范围见 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine adapter 支持范围见 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)。Volcengine provider 细节见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
 
 `vatbrain` 是 provider-neutral 的推理调用抽象层，不是 agent runtime。它不会自动选择 provider、自动选择 model、自动 fallback、自动执行工具或自动维护远端会话。用户代码始终掌控 provider、model、上下文、工具执行和下一轮调用。
 
@@ -27,12 +27,21 @@ OpenAI adapter 使用 `ENV_VATBRAIN_OPENAI_API_KEY`：
 export ENV_VATBRAIN_OPENAI_API_KEY="..."
 ```
 
+Volcengine adapter 使用 optional extra 与 `ENV_VATBRAIN_VOLCENGINE_API_KEY`：
+
+```bash
+.venv/bin/python -m pip install -e ".[volcengine,test]"
+export ENV_VATBRAIN_VOLCENGINE_API_KEY="..."
+```
+
 初始化 client：
 
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
+from whero.vatbrain.providers.volcengine import VolcengineClient
 
-client = OpenAIClient()
+openai_client = OpenAIClient()
+volcengine_client = VolcengineClient()
 ```
 
 也可以显式传入 provider client 参数：
@@ -45,6 +54,8 @@ client = OpenAIClient(
     max_retries=2,
 )
 ```
+
+后文示例默认使用变量名 `client`；它可以是具体 provider client。不同 provider/model 对字段支持不同，应以 capability 和 provider-specific 文档为准。
 
 ## 最小生成
 
@@ -543,11 +554,12 @@ except ProviderRequestError as exc:
 
 ## 当前限制
 
-- 仅实现 OpenAI provider。
-- Generation 使用 OpenAI Responses API，不提供 Chat Completions fallback。
-- Embedding 仅支持文本输入。
-- v0.3 新增的 audio/video/file/reasoning/resource/media 模型主要是 core 表达层，OpenAI adapter 未全部映射。
-- Streaming event 已覆盖 OpenAI Responses API 的主要 lifecycle、text、function/custom tool call、reasoning summary/text 与错误事件；未知事件会 raw passthrough。
+- 已实现 OpenAI 与 Volcengine provider。
+- OpenAI / Volcengine generation 都使用 Responses API，不提供 Chat Completions fallback。
+- Volcengine adapter 只使用 Ark SDK 原生 surface，不使用 OpenAI-compatible surface。
+- OpenAI embedding 仅支持文本输入；Volcengine embedding 支持单样本多模态输入。
+- v0.3 新增的 audio/video/file/reasoning/resource/media 模型主要是 core 表达层，不代表每个 adapter 都已全部映射。
+- Streaming event 已覆盖 OpenAI / Volcengine Responses API 的主要 lifecycle、text、tool call、reasoning summary 与错误事件；未知事件会 raw passthrough。
 - Capability 不维护内部权威模型能力表。
 - 不提供 routing、fallback、自动模型选择、自动工具执行或 agent loop。
 - 不暴露 provider-hosted tool、remote tool、MCP tool、provider conversation 持久化上下文的通用抽象。
@@ -555,6 +567,7 @@ except ProviderRequestError as exc:
 ## 参考
 
 - [user/python/api-reference.CN.md](user/python/api-reference.CN.md)
+- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)
 - [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)
 - [design/high-level-design.CN.md](design/high-level-design.CN.md)
 - [impls/python/STATUS.md](impls/python/STATUS.md)

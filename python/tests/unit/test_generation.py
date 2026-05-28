@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from whero.vatbrain import (
+    GenerationConfig,
     GenerationRequest,
     MessageItem,
     ReasoningConfig,
@@ -10,6 +11,11 @@ from whero.vatbrain import (
     ReplayMode,
     ReplayPolicy,
 )
+
+
+def test_generation_config_does_not_accept_stop_sequences() -> None:
+    with pytest.raises(TypeError):
+        GenerationConfig(stop=["END"])  # type: ignore[call-arg]
 
 
 def test_generation_request_accepts_remote_context_hint() -> None:

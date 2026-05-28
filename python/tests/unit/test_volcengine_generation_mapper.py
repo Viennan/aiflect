@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from whero.vatbrain import (
+    FilePart,
+    FunctionCallItem,
+    FunctionResultItem,
+    FunctionToolType,
+    GenerationConfig,
+    GenerationRequest,
+    ImagePart,
+    MessageItem,
+    ReasoningConfig,
+    ReasoningItem,
+    RemoteContextHint,
+    ReplayMode,
+    ReplayPolicy,
+    ResponseFormat,
+    TextPart,
+    ToolCallConfig,
+    ToolChoice,
+    ToolSpec,
+    VideoPart,
+)
+from whero.vatbrain.core.errors import InvalidItemError, UnsupportedCapabilityError
+from whero.vatbrain.providers.volcengine.mapper import (
+    from_volcengine_generation_response,
+    to_volcengine_generation_params,
+)
+
+
+def test_generation_request_maps_ark_responses_params() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[
+            MessageItem.system("covered"),
+            MessageItem.user(
+                [
+                    TextPart("describe"),
+                    ImagePart(url="https://example.test/a.png"),
+                    VideoPart(url="https://example.test/a.mp4", fps=0.5),
+                    FilePart(file_id="file_1", media_type="application/pdf", filename="a.pdf"),
+                ]
+            ),
+            FunctionResultItem(call_id="call_1", output='{"ok":true}'),
+        ],
+        tools=[
+            ToolSpec(
+                name="lookup",
+                description="Lookup data",
+                parameters_schema={"type": "object", "properties": {"q": {"type": "string"}}},
+                strict=True,
+            )
+        ],
+        generation_config=GenerationConfig(temperature=0.2, top_p=0.8, max_output_tokens=128),
+        response_format=ResponseFormat(
+            json_schema={"type": "object", "properties": {"answer": {"type": "string"}}},
+            json_schema_name="answer",
+            json_schema_strict=True,
+        ),
+        reasoning=ReasoningConfig(mode="enabled", effort="low"),
+        tool_call_config=ToolCallConfig(parallel_tool_calls=True, tool_choice=ToolChoice.AUTO),
+        remote_context=RemoteContextHint(
+            previous_response_id="resp_old",
+            covered_item_count=1,
+            store=True,
+        ),
+    )
+
+    params = to_volcengine_generation_params(request)
+
+    assert params["model"] == "doubao-test"
+    assert params["previous_response_id"] == "resp_old"
+    assert params["store"] is True
+    assert len(params["input"]) == 2
+    assert params["input"][0]["role"] == "user"
+    assert params["input"][0]["content"] == [
+        {"type": "input_text", "text": "describe"},
+        {"type": "input_image", "detail": "auto", "image_url": "https://example.test/a.png"},
+        {"type": "input_video", "video_url": "https://example.test/a.mp4", "fps": 0.5},
+        {"type": "input_file", "file_id": "file_1", "filename": "a.pdf"},
+    ]
+    assert params["input"][1] == {
+        "type": "function_call_output",
+        "call_id": "call_1",
+        "output": '{"ok":true}',
+    }
+    assert params["tools"] == [
+        {
+            "type": "function",
+            "name": "lookup",
+            "description": "Lookup data",
+            "parameters": {"type": "object", "properties": {"q": {"type": "string"}}},
+            "strict": True,
+        }
+    ]
+    assert params["thinking"] == {"type": "enabled"}
+    assert params["reasoning"] == {"effort": "low"}
+    assert params["parallel_tool_calls"] is True
+    assert params["tool_choice"] == "auto"
+    assert params["text"]["format"]["name"] == "answer"
+    assert params["text"]["format"]["strict"] is True
+
+
+def test_generation_mapper_can_replay_without_remote_context() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem.system("covered"), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
+    )
+
+    params = to_volcengine_generation_params(request, use_remote_context=False)
+
+    assert "previous_response_id" not in params
+    assert len(params["input"]) == 2
+    assert params["input"][0]["role"] == "system"
+
+
+def test_generation_mapper_rejects_custom_tools() -> None:
+    custom_tool_request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem.user("run code")],
+        tools=[ToolSpec(name="run_code", type=FunctionToolType.CUSTOM)],
+    )
+    with pytest.raises(UnsupportedCapabilityError, match="custom tools"):
+        to_volcengine_generation_params(custom_tool_request)
+
+
+def test_generation_mapper_requires_reasoning_provider_snapshot_for_replay() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[ReasoningItem(summary="prior thinking")],
+        replay_policy=ReplayPolicy(mode=ReplayMode.NORMALIZED_ONLY),
+    )
+
+    with pytest.raises(InvalidItemError, match="reasoning replay"):
+        to_volcengine_generation_params(request)
+
+
+def test_generation_response_maps_reasoning_function_call_output_and_snapshots() -> None:
+    response = SimpleNamespace(
+        id="resp_1",
+        model="doubao-test",
+        status="completed",
+        output=[
+            SimpleNamespace(
+                type="reasoning",
+                id="rs_1",
+                status="completed",
+                summary=[SimpleNamespace(type="summary_text", text="I checked the premise.")],
+            ),
+            SimpleNamespace(
+                type="message",
+                id="msg_1",
+                role="assistant",
+                content=[SimpleNamespace(type="output_text", text="done")],
+            ),
+            SimpleNamespace(
+                type="function_call",
+                id="fc_1",
+                name="lookup",
+                arguments='{"q":"x"}',
+                call_id="call_1",
+                status="completed",
+            ),
+            SimpleNamespace(
+                type="function_call_output",
+                id="fco_1",
+                call_id="call_1",
+                output='{"ok":true}',
+            ),
+        ],
+        usage=SimpleNamespace(
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            output_tokens_details=SimpleNamespace(reasoning_tokens=2),
+        ),
+    )
+
+    mapped = from_volcengine_generation_response(response)
+
+    assert mapped.id == "resp_1"
+    assert isinstance(mapped.output_items[0], ReasoningItem)
+    assert mapped.output_items[0].summary == "I checked the premise."
+    assert mapped.output_items[0].provider_snapshots[0].payload["type"] == "reasoning"
+    assert isinstance(mapped.output_items[2], FunctionCallItem)
+    assert mapped.output_items[2].name == "lookup"
+    assert isinstance(mapped.output_items[3], FunctionResultItem)
+    assert mapped.usage is not None
+    assert mapped.usage.reasoning_tokens == 2
+
+    replay_params = to_volcengine_generation_params(
+        GenerationRequest(model="doubao-test", items=[mapped.output_items[0]])
+    )
+    assert replay_params["input"][0]["type"] == "reasoning"

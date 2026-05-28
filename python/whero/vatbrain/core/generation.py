@@ -19,7 +19,6 @@ class GenerationConfig:
     temperature: float | None = None
     top_p: float | None = None
     max_output_tokens: int | None = None
-    stop: str | list[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)

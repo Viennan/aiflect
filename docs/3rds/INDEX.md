@@ -1,11 +1,11 @@
 # 第三方资料索引
 
 状态：持续维护  
-最近更新：2026-05-05
+最近更新：2026-05-14
 
 ## Volcengine
 
-- [3rds/volengine/INDEX.md](3rds/volengine/INDEX.md)：火山方舟第三方资料索引，按 API 家族归纳 Responses、Chat、Files、多模态 embedding、图片理解、视频理解、图片生成、视频生成、结构化输出、函数调用、reasoning 与 streaming。
+- [3rds/volengine/INDEX.md](3rds/volengine/INDEX.md)：火山方舟第三方资料索引，按 API 家族归纳 Responses、Responses API 文本/多模态/reasoning/tool calling 专题、Chat、Files、多模态 embedding、图片理解、视频理解、图片生成、视频生成、结构化输出、函数调用、reasoning 与 streaming。
 
 ## 维护说明
 

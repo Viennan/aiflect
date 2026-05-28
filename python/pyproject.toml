@@ -15,6 +15,9 @@ dependencies = [
 pydantic = [
     "pydantic>=2,<3",
 ]
+volcengine = [
+    "volcengine-python-sdk[ark]>=5.0.30,<6",
+]
 test = [
     "pydantic>=2,<3",
     "pytest>=8.0",

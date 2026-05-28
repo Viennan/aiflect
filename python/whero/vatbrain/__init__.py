@@ -65,7 +65,6 @@ from whero.vatbrain.core.media import (
 )
 from whero.vatbrain.core.resources import (
     FilePreprocessConfig,
-    FilePurpose,
     FileResource,
     FileStatus,
     FileUploadRequest,
@@ -94,7 +93,6 @@ __all__ = [
     "EmbeddingVector",
     "FilePart",
     "FilePreprocessConfig",
-    "FilePurpose",
     "FileResource",
     "FileStatus",
     "FileUploadRequest",
