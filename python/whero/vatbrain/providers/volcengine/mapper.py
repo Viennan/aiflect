@@ -36,6 +36,33 @@ from whero.vatbrain.core.usage import Usage
 PROVIDER = "volcengine"
 API_FAMILY = "responses"
 
+_RESPONSE_CREATE_SDK_PARAMS = {
+    "input",
+    "model",
+    "instructions",
+    "max_output_tokens",
+    "parallel_tool_calls",
+    "previous_response_id",
+    "thinking",
+    "store",
+    "caching",
+    "stream",
+    "temperature",
+    "text",
+    "tool_choice",
+    "tools",
+    "top_p",
+    "max_tool_calls",
+    "expire_at",
+    "extra_headers",
+    "extra_query",
+    "extra_body",
+    "timeout",
+    "reasoning",
+    "session",
+    "service_tier",
+}
+
 
 def to_volcengine_generation_params(
     request: GenerationRequest,
@@ -67,14 +94,22 @@ def to_volcengine_generation_params(
         if reasoning_params:
             params["reasoning"] = reasoning_params
     if request.remote_context:
-        params.update(dict(request.remote_context.provider_options))
+        _merge_sdk_provider_options(
+            params,
+            request.remote_context.provider_options,
+            sdk_params=_RESPONSE_CREATE_SDK_PARAMS,
+        )
         if use_remote_context and request.remote_context.previous_response_id is not None:
             params["previous_response_id"] = request.remote_context.previous_response_id
         if request.remote_context.store is not None:
             params["store"] = request.remote_context.store
     if request.tool_call_config:
         params.update(_tool_call_config_to_params(request.tool_call_config))
-    params.update(request.provider_options)
+    _merge_sdk_provider_options(
+        params,
+        request.provider_options,
+        sdk_params=_RESPONSE_CREATE_SDK_PARAMS,
+    )
     if not use_remote_context:
         params.pop("previous_response_id", None)
     return params
@@ -126,6 +161,11 @@ def usage_from_volcengine(usage: Any | None) -> Usage | None:
     total_tokens = _get_attr(usage, "total_tokens", None)
     cached_tokens = _detail_token(usage, "input_tokens_details", "cached_tokens")
     reasoning_tokens = _detail_token(usage, "output_tokens_details", "reasoning_tokens")
+    metadata: dict[str, Any] = {}
+    for name in ("tool_usage", "tool_usage_details"):
+        value = _get_attr(usage, name, None)
+        if value is not None:
+            metadata[name] = _to_plain_data(value)
     return Usage(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
@@ -133,6 +173,7 @@ def usage_from_volcengine(usage: Any | None) -> Usage | None:
         cached_tokens=cached_tokens,
         reasoning_tokens=reasoning_tokens,
         raw=usage,
+        metadata=metadata,
     )
 
 
@@ -168,7 +209,14 @@ def _item_to_volcengine_input(item: Item, replay_policy: ReplayPolicy | None = N
     if isinstance(item, MessageItem):
         return _message_to_volcengine_input(item)
     if isinstance(item, FunctionResultItem):
-        return {"type": "function_call_output", "call_id": item.call_id, "output": item.output}
+        payload: dict[str, Any] = {
+            "type": "function_call_output",
+            "call_id": item.call_id,
+            "output": item.output,
+        }
+        if "status" in item.metadata:
+            payload["status"] = item.metadata["status"]
+        return payload
     if isinstance(item, FunctionCallItem):
         if item.type != FunctionToolType.FUNCTION:
             raise UnsupportedCapabilityError("Volcengine adapter maps function tool calls only.")
@@ -181,9 +229,7 @@ def _item_to_volcengine_input(item: Item, replay_policy: ReplayPolicy | None = N
             **({"status": item.status} if item.status is not None else {}),
         }
     if isinstance(item, ReasoningItem):
-        raise InvalidItemError(
-            "Volcengine reasoning replay requires a provider-native Responses item snapshot."
-        )
+        return _reasoning_item_to_volcengine_input(item)
     raise InvalidItemError(f"Unsupported generation item: {item!r}")
 
 
@@ -200,7 +246,12 @@ def _message_to_volcengine_input(item: MessageItem) -> dict[str, Any]:
             content.append(_file_part_to_volcengine(part))
         else:
             raise InvalidItemError(f"Unsupported message part: {part!r}")
-    return {"type": "message", "role": item.role.value, "content": content}
+    payload: dict[str, Any] = {"type": "message", "role": item.role.value, "content": content}
+    if "partial" in item.metadata:
+        payload["partial"] = item.metadata["partial"]
+    if "status" in item.metadata:
+        payload["status"] = item.metadata["status"]
+    return payload
 
 
 def _text_type_for_role(role: Role) -> str:
@@ -406,6 +457,24 @@ def _detail_token(usage: Any, detail_name: str, token_name: str) -> int | None:
     if details is None:
         return None
     return _get_attr(details, token_name, None)
+
+
+def _merge_sdk_provider_options(
+    params: dict[str, Any],
+    options: Mapping[str, Any],
+    *,
+    sdk_params: set[str],
+) -> None:
+    extra_body = dict(params.get("extra_body", {}) or {})
+    for key, value in options.items():
+        if key == "extra_body":
+            extra_body.update(dict(value or {}))
+        elif key in sdk_params:
+            params[key] = value
+        else:
+            extra_body[key] = value
+    if extra_body:
+        params["extra_body"] = extra_body
 
 
 def _data_url(data: str | None, mime_type: str) -> str | None:

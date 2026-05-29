@@ -1,12 +1,12 @@
 # Python API 参考
 
-状态：v0.4
+状态：v0.5
 日期：2026-05-13
-最近更新：2026-05-28
+最近更新：2026-05-29
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.4 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)；Volcengine provider 用法见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.5 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)；Volcengine provider 用法见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 
@@ -97,6 +97,10 @@ OpenAI client 方法：
 - `agenerate_parsed(...) -> ParsedGenerationResponse`
 - `embed(...) -> EmbeddingResponse`
 - `aembed(...) -> EmbeddingResponse`
+- `generate_image(...) -> ImageGenerationResponse`
+- `agenerate_image(...) -> ImageGenerationResponse`
+- `stream_generate_image(...) -> Iterator[ImageGenerationStreamEvent]`
+- `astream_generate_image(...) -> AsyncIterator[ImageGenerationStreamEvent]`
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
@@ -152,6 +156,16 @@ Volcengine client 方法：
 - `adelete_file(file_id, ...) -> FileResource`
 - `wait_for_file_processing(file_id, ...) -> FileResource`
 - `await_file_processing(file_id, ...) -> FileResource`
+- `generate_image(...) -> ImageGenerationResponse`
+- `agenerate_image(...) -> ImageGenerationResponse`
+- `stream_generate_image(...) -> Iterator[ImageGenerationStreamEvent]`
+- `astream_generate_image(...) -> AsyncIterator[ImageGenerationStreamEvent]`
+- `create_video_generation_task(...) -> MediaGenerationTask`
+- `acreate_video_generation_task(...) -> MediaGenerationTask`
+- `get_video_generation_task(task_id, ...) -> MediaGenerationTask`
+- `aget_video_generation_task(task_id, ...) -> MediaGenerationTask`
+- `wait_for_video_generation_task(task_id, ...) -> MediaGenerationTask`
+- `await_video_generation_task(task_id, ...) -> MediaGenerationTask`
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
@@ -755,7 +769,7 @@ vector = EmbeddingVector(index=0, dense=[0.1, 0.2], sparse=sparse)
 - `metadata`
 - `raw`
 
-Volcengine 多模态 embedding 每次 request 只提交一个 `EmbeddingInput`；该 input 内部可以混合 text/image/video parts。Ark API 一次返回一个向量，如需多个样本，请在用户代码中循环调用。
+Volcengine 多模态 embedding 每次 request 只提交一个 `EmbeddingInput`；该 input 内部可以混合 text/image/video parts。Ark API 一次返回一个向量，如需多个样本，请在用户代码中循环调用。`sparse_embedding=True/False` 映射为 Ark `sparse_embedding.type`，仅支持纯文本输入；包含图片或视频时 adapter 会拒绝该配置。
 
 ## Resources
 
@@ -818,7 +832,7 @@ Core 不定义文件 purpose 通用枚举，`FileUploadRequest` / `FileResource`
 
 ## Media
 
-v0.3 已定义 media generation core 模型，但当前 OpenAI / Volcengine adapter 尚未暴露 image/video generation 方法。
+Media generation 是独立 API family，不复用 `GenerationRequest` 或 `ToolSpec`。v0.5 已实现 OpenAI 直接 Images API、Volcengine Ark Images API，以及 Volcengine Ark Content Generation 视频任务。
 
 ### MediaArtifact
 
@@ -844,9 +858,12 @@ from whero.vatbrain import ImageGenerationRequest
 request = ImageGenerationRequest(
     model="image-model",
     prompt="A product photo on a clean desk.",
-    size="1024x1024",
+    quality="high",
+    background="transparent",
     output_format="png",
+    response_format="url",
     count=1,
+    watermark=True,
 )
 ```
 
@@ -859,12 +876,141 @@ request = ImageGenerationRequest(
 - `metadata`
 - `raw`
 
+`ImageGenerationRequest` 不包含 `tools`。Media generation 不复用 generation/function calling 的 `ToolSpec`；provider-native 媒体生成开关通过 `provider_options` 显式传递。OpenAI adapter 只覆盖直接 Images API，不覆盖通过 GPT/Responses 内置 image generation tool 的间接路径；是否存在参考图由 OpenAI adapter 自动路由到 `images.generate` 或 `images.edit`。
+
+字段说明：
+
+- `model`：provider model id。
+- `prompt`：图片生成提示词。
+- `input_items`：参考图片上下文；OpenAI adapter 根据是否存在参考图选择 `images.generate` 或 `images.edit`，Volcengine adapter 映射为 Ark `images.generate` 的 `image` 参数。
+- `quality`：图片质量控制。OpenAI adapter 发送给 Images API；Volcengine adapter 当前忽略，因为 Ark Images API 没有等价字段。
+- `background`：背景控制。OpenAI adapter 支持 `auto`、`transparent`、`opaque`；Volcengine adapter 当前忽略。能力可通过 `MediaGenerationCapability.image_background_control` 和 `image_background_values` 查询。
+- `output_format`：输出文件格式，例如 `png`、`jpeg`、`webp`；具体 provider/model 支持范围以 capability 和 provider 文档为准。
+- `response_format`：返回形态，例如 `url` 或 `b64_json`。
+- `count`：期望生成数量。OpenAI 映射为 `n`；Volcengine 映射为 Ark `sequential_image_generation_options.max_images`，通常需配合 `provider_options={"sequential_image_generation": "auto"}` 使用组图能力。
+- `watermark`：是否要求 provider 添加 AI 水印，默认 `True`。
+- `stream_options`：保留的通用流式选项；图片生成当前不映射 provider-native stream options。
+- `provider_options`：provider-native 参数。OpenAI 可传 `moderation`、`output_compression`、`partial_images`、`user` 等；Volcengine 可传 `size`、`sequential_image_generation`、`sequential_image_generation_options`、`optimize_prompt_options`、`seed` 等 Ark 参数。
+
+`watermark` 用于表达是否要求 provider 添加 AI 水印，默认 `True`。若 provider 或模型没有可控水印能力，adapter 会忽略该参数；OpenAI Images API 当前不会接收该参数。
+
+`ImageGenerationRequest` 也不包含 normalized `size` 字段。图片生成默认采用 auto 模式，由模型从 prompt 中感知分辨率、长宽比和构图规格；如果必须使用 provider 原生分辨率控制，应通过 `provider_options` 明确传递。
+
 `ImageGenerationStreamEvent` 用于表达图片生成流式事件，字段包括 `type`、`sequence`、`provider`、`task_id`、`artifact`、`delta`、`usage`、`error`、`metadata`、`raw_event`。
+
+OpenAI 图片生成：
+
+```python
+response = client.generate_image(
+    model="gpt-image-1",
+    prompt="A product photo on a clean desk.",
+    output_format="png",
+    response_format="b64_json",
+)
+```
+
+OpenAI 参考图生成仍使用同一个入口。存在 `ImagePart(data=...)` 时，adapter 自动调用 `images.edit`：
+
+```python
+from whero.vatbrain import ImagePart, MessageItem
+
+response = client.generate_image(
+    model="gpt-image-1",
+    prompt="Restyle this product photo.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(data="data:image/png;base64,..."),
+        ])
+    ],
+)
+```
+
+OpenAI adapter 不会隐式下载 `ImagePart(url=...)` 作为 edit 输入。需要参考图时应提供显式图片内容。
+
+Volcengine 图片生成同样使用 `generate_image()`；纯文本生成与参考图生成都映射到 Ark SDK 原生 `images.generate`：
+
+```python
+response = client.generate_image(
+    model="doubao-seedream-5-0-260128",
+    prompt="A product photo on a clean desk.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(url="https://example.test/reference.png"),
+        ])
+    ],
+    response_format="url",
+    watermark=False,
+)
+```
+
+图片流式生成：
+
+```python
+for event in client.stream_generate_image(
+    model="gpt-image-1",
+    prompt="A cinematic product photo.",
+    provider_options={"partial_images": 2},
+):
+    if event.artifact:
+        print(event.type, event.artifact.url or event.artifact.data)
+```
+
+异步入口为 `agenerate_image()` 与 `astream_generate_image()`。
+
+### VideoGenerationRequest
+
+`VideoGenerationRequest` 表达视频生成任务。当前由 Volcengine adapter 实现；OpenAI adapter v0.5 不暴露视频生成方法。
+
+字段：
+
+- `model`
+- `prompt`
+- `input_items`
+- `duration_seconds`
+- `ratio`
+- `resolution`
+- `generate_audio`
+- `watermark`
+- `stream_options`
+- `provider_options`
+
+字段说明：
+
+- `model`：provider model id。
+- `prompt`：视频生成提示词；Volcengine adapter 会作为 `content` 的首个 text part 发送。
+- `input_items`：参考图片、视频、音频、文件或补充文本。它是 media reference context，不是对话历史。
+- `duration_seconds`：目标时长，Volcengine 映射为 `duration`。Ark 要求整数秒；adapter 当前会转换为 `int`。
+- `ratio`：视频宽高比，例如 `16:9`、`4:3`、`1:1`、`3:4`、`9:16`、`21:9`、`adaptive`。
+- `resolution`：输出分辨率，例如 `480p`、`720p`、`1080p`；不同 Volcengine 模型支持范围不同。
+- `generate_audio`：是否生成与画面同步的声音。
+- `watermark`：是否要求 provider 添加 AI 水印，默认 `True`。
+- `stream_options`：保留字段；当前视频生成走异步任务，不映射为 provider stream 参数。
+- `provider_options`：provider-native 参数。Volcengine 可传 `seed`、`frames`、`return_last_frame`、`callback_url`、`service_tier`、`execution_expires_after`、`draft`、`priority`、`safety_identifier` 等 Ark task create 参数。
+
+`input_items` 可携带参考图片、视频、音频或文件。Volcengine adapter 支持 `ImagePart(url/data)`、`VideoPart(url/data)`、`AudioPart(url/data)`，以及带 image/video/audio `media_type` 或 `mime_type` 的 `FilePart(url/data)`。`file_id` 与 `local_path` 不会被隐式上传或读取。若需要指定参考素材 role，可在 part metadata 中传入 `role`，例如 `first_frame`、`last_frame`、`reference_image`、`reference_video`。
+
+`watermark` 用于表达是否要求 provider 添加 AI 水印，默认 `True`。若 provider 或模型没有可控水印能力，adapter 会忽略该参数。
 
 ### MediaGenerationTask
 
 ```python
-from whero.vatbrain import MediaGenerationTask, TaskStatus
+from whero.vatbrain import ImagePart, MediaGenerationTask, MessageItem, TaskStatus, VideoGenerationRequest
+
+request = VideoGenerationRequest(
+    model="video-model",
+    prompt="A short cinematic clip.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(
+                url="https://example.test/first-frame.png",
+                metadata={"role": "first_frame"},
+            ),
+        ])
+    ],
+    duration_seconds=8,
+    ratio="16:9",
+    watermark=True,
+)
 
 task = MediaGenerationTask(
     id="task_123",
@@ -875,6 +1021,30 @@ task = MediaGenerationTask(
 ```
 
 `TaskStatus`：`queued`、`running`、`completed`、`failed`、`canceled`、`expired`、`unknown`。
+
+Volcengine client 暴露视频任务方法：
+
+```python
+task = client.create_video_generation_task(
+    model="doubao-seedance-2-0-260128",
+    prompt="A short cinematic clip.",
+    input_items=request.input_items,
+    duration_seconds=8,
+    ratio="16:9",
+    generate_audio=True,
+    watermark=False,
+)
+
+task = client.get_video_generation_task(task.id, provider_options={})
+task = client.wait_for_video_generation_task(
+    task.id,
+    poll_interval=10.0,
+    max_wait_seconds=600.0,
+    provider_options={},
+)
+```
+
+`get_video_generation_task()` / `aget_video_generation_task()` 的 `provider_options` 会透传给 Ark task get。`wait_for_video_generation_task()` / `await_video_generation_task()` 会轮询到终态：`completed`、`failed`、`canceled` 或 `expired`；`poll_interval` 控制轮询间隔，`max_wait_seconds` 控制最大等待时间，超时会抛 `TimeoutError`。OpenAI adapter v0.5 不暴露视频生成方法。
 
 ## Capability
 
@@ -958,7 +1128,15 @@ print(capability.tools.custom_tools.value)
 - `streaming`
 - `async_task`
 - `output_formats`
+- `image_background_control`
+- `image_background_values`
 - `metadata`
+
+`image_background_values` 当前使用 OpenAI Images API 的背景枚举：
+
+- `auto`：由模型/provider 自动选择背景模式。
+- `transparent`：请求透明背景，通常需要支持透明通道的输出格式。
+- `opaque`：请求不透明背景。
 
 `ToolCapability` 字段：
 
@@ -1073,6 +1251,7 @@ from whero.vatbrain.core.errors import (
 - provider-native item snapshot replay。
 - OpenAI assistant message `phase` 与 `AssistantMessagePhase`。
 - text embedding。
+- Images API 图片生成、参考图生成与图片流式生成。
 - adapter/model capability 查询与用户覆写。
 
 当前 OpenAI adapter 不支持：
@@ -1083,7 +1262,9 @@ from whero.vatbrain.core.errors import (
 - provider conversation 持久化上下文抽象。
 - OpenAI 文件资源管理方法。
 - 多模态 embedding。
-- image/video generation 方法。
+- video generation 方法。
+- OpenAI image variation API。
+- 通过 Responses API hosted image generation tool 间接生成图片。
 - 跨 provider replay。
 
 ## Volcengine Adapter 支持范围
@@ -1106,6 +1287,8 @@ from whero.vatbrain.core.errors import (
 - provider-native item snapshot replay。
 - Files API upload/retrieve/list/delete/wait。
 - 多模态 embedding、instructions、dense/sparse vector。
+- Ark Images API 图片生成、参考图生成与图片流式生成。
+- Ark Content Generation 视频任务创建、查询与轮询。
 - adapter/model capability 查询与用户覆写。
 
 当前 Volcengine adapter 不支持：
@@ -1118,5 +1301,4 @@ from whero.vatbrain.core.errors import (
 - provider-hosted tools、remote tools、MCP tools 的稳定通用抽象。
 - provider conversation 持久化上下文抽象。
 - 本地文件隐式上传。
-- image/video generation 方法。
 - 跨 provider replay。

@@ -26,8 +26,10 @@ def test_embedding_request_maps_multimodal_parts_and_instructions() -> None:
         ],
         instructions="Target_modality: text.",
         dimensions=1024,
-        sparse_embedding=True,
-        provider_options={"extra_body": {"trace_id": "trace-1"}},
+        provider_options={
+            "trace_id": "trace-1",
+            "extra_body": {"custom_flag": True},
+        },
     )
 
     params = to_volcengine_embedding_params(request)
@@ -35,10 +37,10 @@ def test_embedding_request_maps_multimodal_parts_and_instructions() -> None:
     assert params["model"] == "doubao-embedding-vision-test"
     assert params["encoding_format"] == "float"
     assert params["dimensions"] == 1024
-    assert params["sparse_embedding"] == {"type": "enabled"}
     assert params["extra_body"] == {
         "instructions": "Target_modality: text.",
         "trace_id": "trace-1",
+        "custom_flag": True,
     }
     assert params["input"] == [
         {"type": "text", "text": "hello"},
@@ -50,7 +52,19 @@ def test_embedding_request_maps_multimodal_parts_and_instructions() -> None:
     ]
 
 
-def test_embedding_request_rejects_batch_and_video_file_id() -> None:
+def test_embedding_request_maps_text_sparse_embedding() -> None:
+    request = EmbeddingRequest(
+        model="doubao-embedding-vision-test",
+        inputs=["hello"],
+        sparse_embedding=True,
+    )
+
+    params = to_volcengine_embedding_params(request)
+
+    assert params["sparse_embedding"] == {"type": "enabled"}
+
+
+def test_embedding_request_rejects_batch_video_file_id_and_sparse_multimodal() -> None:
     with pytest.raises(UnsupportedCapabilityError, match="one vector per request"):
         to_volcengine_embedding_params(
             EmbeddingRequest(model="doubao-embedding-vision-test", inputs=["a", "b"])
@@ -61,6 +75,22 @@ def test_embedding_request_rejects_batch_and_video_file_id() -> None:
             EmbeddingRequest(
                 model="doubao-embedding-vision-test",
                 inputs=[EmbeddingInput([VideoPart(file_id="file_1")])],
+            )
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="text-only"):
+        to_volcengine_embedding_params(
+            EmbeddingRequest(
+                model="doubao-embedding-vision-test",
+                inputs=[
+                    EmbeddingInput(
+                        [
+                            TextPart("hello"),
+                            ImagePart(url="https://example.test/a.png"),
+                        ]
+                    )
+                ],
+                sparse_embedding=True,
             )
         )
 
@@ -76,7 +106,11 @@ def test_embedding_response_maps_dense_sparse_and_usage() -> None:
                 SimpleNamespace(index=3, value=0.4),
             ],
         ),
-        usage=SimpleNamespace(prompt_tokens=7, total_tokens=7),
+        usage=SimpleNamespace(
+            prompt_tokens=7,
+            total_tokens=7,
+            prompt_tokens_details=SimpleNamespace(text_tokens=5, image_tokens=2),
+        ),
     )
 
     mapped = from_volcengine_embedding_response(response)
@@ -91,3 +125,7 @@ def test_embedding_response_maps_dense_sparse_and_usage() -> None:
     assert mapped.usage is not None
     assert mapped.usage.input_tokens == 7
     assert mapped.usage.total_tokens == 7
+    assert mapped.usage.metadata["prompt_tokens_details"] == {
+        "text_tokens": 5,
+        "image_tokens": 2,
+    }

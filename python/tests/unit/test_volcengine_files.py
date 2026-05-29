@@ -97,6 +97,30 @@ def test_file_resource_maps_status_purpose_timestamps_and_preprocess() -> None:
     assert mapped.preprocess.video_fps == 0.3
 
 
+@pytest.mark.parametrize(
+    ("raw_status", "expected"),
+    [
+        ("uploaded", FileStatus.UPLOADED),
+        ("processing", FileStatus.PROCESSING),
+        ("in_progress", FileStatus.PROCESSING),
+        ("active", FileStatus.READY),
+        ("processed", FileStatus.READY),
+        ("ready", FileStatus.READY),
+        ("success", FileStatus.READY),
+        ("failed", FileStatus.FAILED),
+        ("expired", FileStatus.EXPIRED),
+        ("deleted", FileStatus.DELETED),
+    ],
+)
+def test_file_resource_maps_documented_and_sdk_statuses(
+    raw_status: str,
+    expected: FileStatus,
+) -> None:
+    mapped = from_volcengine_file_resource(SimpleNamespace(id="file_1", status=raw_status))
+
+    assert mapped.status == expected
+
+
 def test_file_delete_response_maps_tombstone_resource() -> None:
     mapped = from_volcengine_file_delete_response(
         SimpleNamespace(id="file_1", deleted=True),

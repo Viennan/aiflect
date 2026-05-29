@@ -10,6 +10,7 @@ from whero.vatbrain.core.capabilities import (
     CapabilityValue,
     EmbeddingCapability,
     GenerationCapability,
+    MediaGenerationCapability,
     ModelCapability,
     ToolCapability,
 )
@@ -49,6 +50,17 @@ def get_adapter_capability() -> AdapterCapability:
             dense=CapabilityValue.adapter_builtin(True),
             sparse=CapabilityValue.adapter_builtin(False),
             instructions=CapabilityValue.adapter_builtin(False),
+        ),
+        media_generation=MediaGenerationCapability(
+            image_generation=CapabilityValue.adapter_builtin(True),
+            video_generation=CapabilityValue.adapter_builtin(False),
+            streaming=CapabilityValue.adapter_builtin(True),
+            async_task=CapabilityValue.adapter_builtin(False),
+            output_formats=CapabilityValue.adapter_builtin(("png", "jpeg", "webp")),
+            image_background_control=CapabilityValue.adapter_builtin(True),
+            image_background_values=CapabilityValue.adapter_builtin(
+                ("auto", "transparent", "opaque")
+            ),
         ),
         tools=ToolCapability(
             user_function_tools=CapabilityValue.adapter_builtin(True),

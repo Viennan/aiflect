@@ -59,7 +59,10 @@ def test_image_part_requires_exactly_one_source() -> None:
     with pytest.raises(ValueError):
         ImagePart(url="https://example.test/a.png", data="abc")
 
-    assert ImagePart(url="https://example.test/a.png").url == "https://example.test/a.png"
+    part = ImagePart(url="https://example.test/a.png", metadata={"role": "first_frame"})
+
+    assert part.url == "https://example.test/a.png"
+    assert part.metadata == {"role": "first_frame"}
 
 
 @pytest.mark.parametrize("part_cls", [AudioPart, VideoPart, FilePart])

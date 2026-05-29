@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from whero.vatbrain import (
     ClientConfig,
+    ImagePart,
     MessageItem,
     ReasoningConfig,
     RemoteContextHint,
@@ -14,7 +15,7 @@ from whero.vatbrain import (
     ReplayPolicy,
     ToolCallConfig,
 )
-from whero.vatbrain.core.errors import ProviderRequestError
+from whero.vatbrain.core.errors import ProviderRequestError, UnsupportedCapabilityError
 from whero.vatbrain.core.generation import StreamEventType
 from whero.vatbrain.providers.openai import OpenAIClient
 
@@ -73,6 +74,56 @@ class AsyncFakeResponses:
         return self.result
 
 
+class AsyncFakeStream:
+    def __init__(self, items: list[object] | tuple[object, ...]) -> None:
+        self._items = iter(items)
+
+    def __aiter__(self) -> AsyncFakeStream:
+        return self
+
+    async def __anext__(self) -> object:
+        try:
+            return next(self._items)
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
+
+
+class FakeImages:
+    def __init__(self, *, generate_result: object, edit_result: object | None = None) -> None:
+        self.generate_result = generate_result
+        self.edit_result = edit_result if edit_result is not None else generate_result
+        self.generate_calls: list[dict[str, object]] = []
+        self.edit_calls: list[dict[str, object]] = []
+
+    def generate(self, **kwargs: object) -> object:
+        self.generate_calls.append(kwargs)
+        return self.generate_result
+
+    def edit(self, **kwargs: object) -> object:
+        self.edit_calls.append(kwargs)
+        return self.edit_result
+
+
+class AsyncFakeImages:
+    def __init__(self, *, generate_result: object, edit_result: object | None = None) -> None:
+        self.generate_result = generate_result
+        self.edit_result = edit_result if edit_result is not None else generate_result
+        self.generate_calls: list[dict[str, object]] = []
+        self.edit_calls: list[dict[str, object]] = []
+
+    async def generate(self, **kwargs: object) -> object:
+        self.generate_calls.append(kwargs)
+        if kwargs.get("stream") is True and isinstance(self.generate_result, (list, tuple)):
+            return AsyncFakeStream(self.generate_result)
+        return self.generate_result
+
+    async def edit(self, **kwargs: object) -> object:
+        self.edit_calls.append(kwargs)
+        if kwargs.get("stream") is True and isinstance(self.edit_result, (list, tuple)):
+            return AsyncFakeStream(self.edit_result)
+        return self.edit_result
+
+
 class FakeEmbeddings:
     def __init__(self, result: object) -> None:
         self.result = result
@@ -84,9 +135,20 @@ class FakeEmbeddings:
 
 
 class FakeOpenAI:
-    def __init__(self, *, response: object, embedding: object | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        response: object,
+        embedding: object | None = None,
+        image_generate: object | None = None,
+        image_edit: object | None = None,
+    ) -> None:
         self.responses = FakeResponses(response)
         self.embeddings = FakeEmbeddings(embedding or SimpleNamespace(data=[], usage=None))
+        self.images = FakeImages(
+            generate_result=image_generate or SimpleNamespace(data=[], usage=None),
+            edit_result=image_edit,
+        )
 
 
 class FakeOpenAIRaising:
@@ -107,8 +169,18 @@ class FakeAsyncOpenAIFallback:
 
 
 class FakeAsyncOpenAI:
-    def __init__(self, *, response: object) -> None:
+    def __init__(
+        self,
+        *,
+        response: object,
+        image_generate: object | None = None,
+        image_edit: object | None = None,
+    ) -> None:
         self.responses = AsyncFakeResponses(response)
+        self.images = AsyncFakeImages(
+            generate_result=image_generate or SimpleNamespace(data=[], usage=None),
+            edit_result=image_edit,
+        )
 
 
 class FakeOpenAIError(Exception):
@@ -373,6 +445,139 @@ def test_client_stream_generate_replays_without_remote_context_when_enabled() ->
     assert "previous_response_id" not in fake.responses.calls[1]
     assert len(fake.responses.calls[1]["input"]) == 2
     assert events[0].delta == "hi"
+
+
+def test_client_generate_image_uses_images_generate() -> None:
+    raw_image = SimpleNamespace(
+        model="gpt-image-test",
+        data=[SimpleNamespace(url="https://example.test/image.png")],
+        usage=SimpleNamespace(input_tokens=1, output_tokens=2, total_tokens=3),
+    )
+    fake = FakeOpenAI(response=SimpleNamespace(output=[]), image_generate=raw_image)
+    client = OpenAIClient(client=fake, async_client=object())
+
+    response = client.generate_image(
+        model="gpt-image-test",
+        prompt="a small robot",
+        quality="high",
+        output_format="png",
+        response_format="url",
+        count=2,
+        watermark=False,
+        provider_options={"user": "user_1", "watermark": False},
+    )
+
+    assert fake.images.generate_calls[0]["model"] == "gpt-image-test"
+    assert fake.images.generate_calls[0]["prompt"] == "a small robot"
+    assert "size" not in fake.images.generate_calls[0]
+    assert "watermark" not in fake.images.generate_calls[0]
+    assert fake.images.generate_calls[0]["quality"] == "high"
+    assert fake.images.generate_calls[0]["n"] == 2
+    assert fake.images.generate_calls[0]["user"] == "user_1"
+    assert fake.images.edit_calls == []
+    assert response.artifacts[0].url == "https://example.test/image.png"
+    assert response.usage is not None
+    assert response.usage.total_tokens == 3
+
+
+def test_client_generate_image_with_reference_uses_images_edit() -> None:
+    raw_image = SimpleNamespace(
+        model="gpt-image-test",
+        data=[SimpleNamespace(b64_json="abc")],
+        usage=None,
+    )
+    fake = FakeOpenAI(response=SimpleNamespace(output=[]), image_edit=raw_image)
+    client = OpenAIClient(client=fake, async_client=object())
+
+    response = client.generate_image(
+        model="gpt-image-test",
+        prompt="turn this into a sketch",
+        input_items=[MessageItem.user([ImagePart(data="aGVsbG8=", mime_type="image/png")])],
+    )
+
+    image_file = fake.images.edit_calls[0]["image"]
+    assert fake.images.generate_calls == []
+    assert image_file == ("image_0.png", b"hello", "image/png")
+    assert fake.images.edit_calls[0]["prompt"] == "turn this into a sketch"
+    assert response.artifacts[0].data == "abc"
+
+
+def test_client_generate_image_rejects_openai_url_reference() -> None:
+    client = OpenAIClient(client=FakeOpenAI(response=SimpleNamespace(output=[])), async_client=object())
+
+    with pytest.raises(UnsupportedCapabilityError):
+        client.generate_image(
+            model="gpt-image-test",
+            prompt="turn this into a sketch",
+            input_items=[MessageItem.user([ImagePart(url="https://example.test/ref.png")])],
+        )
+
+
+def test_client_stream_generate_image_maps_events() -> None:
+    stream = [
+        SimpleNamespace(
+            type="image_generation.partial_image",
+            b64_json="abc",
+            partial_image_index=0,
+            size="1024x1024",
+        ),
+        SimpleNamespace(
+            type="image_generation.completed",
+            usage=SimpleNamespace(input_tokens=1, output_tokens=2, total_tokens=3),
+        ),
+    ]
+    fake = FakeOpenAI(response=SimpleNamespace(output=[]), image_generate=stream)
+    client = OpenAIClient(client=fake, async_client=object())
+
+    events = list(client.stream_generate_image(model="gpt-image-test", prompt="a small robot"))
+
+    assert fake.images.generate_calls[0]["stream"] is True
+    assert "watermark" not in fake.images.generate_calls[0]
+    assert events[0].type == "image.partial"
+    assert events[0].artifact is not None
+    assert events[0].artifact.data == "abc"
+    assert events[1].type == "image.completed"
+    assert events[1].usage is not None
+    assert events[1].usage.total_tokens == 3
+
+
+@pytest.mark.anyio
+async def test_async_client_generate_image_uses_images_generate() -> None:
+    raw_image = SimpleNamespace(
+        model="gpt-image-test",
+        data=[SimpleNamespace(url="https://example.test/async.png")],
+        usage=None,
+    )
+    fake_async = FakeAsyncOpenAI(response=SimpleNamespace(output=[]), image_generate=raw_image)
+    client = OpenAIClient(client=object(), async_client=fake_async)
+
+    response = await client.agenerate_image(model="gpt-image-test", prompt="a small robot")
+
+    assert fake_async.images.generate_calls[0]["model"] == "gpt-image-test"
+    assert response.artifacts[0].url == "https://example.test/async.png"
+
+
+@pytest.mark.anyio
+async def test_async_client_stream_generate_image_maps_events() -> None:
+    stream = [
+        SimpleNamespace(type="image_generation.partial_image", b64_json="abc"),
+        SimpleNamespace(type="image_generation.completed"),
+    ]
+    fake_async = FakeAsyncOpenAI(response=SimpleNamespace(output=[]), image_generate=stream)
+    client = OpenAIClient(client=object(), async_client=fake_async)
+
+    events = [
+        event
+        async for event in client.astream_generate_image(
+            model="gpt-image-test",
+            prompt="a small robot",
+        )
+    ]
+
+    assert fake_async.images.generate_calls[0]["stream"] is True
+    assert events[0].type == "image.partial"
+    assert events[0].artifact is not None
+    assert events[0].artifact.data == "abc"
 
 
 def test_client_embed_uses_embedding_endpoint() -> None:

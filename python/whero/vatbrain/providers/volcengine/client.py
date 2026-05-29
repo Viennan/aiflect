@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterator, Mapping
 import os
+import time
 from typing import Any
 
 from whero.vatbrain.core.capabilities import AdapterCapability, ModelCapability
@@ -24,6 +26,14 @@ from whero.vatbrain.core.generation import (
     ToolCallConfig,
 )
 from whero.vatbrain.core.items import Item
+from whero.vatbrain.core.media import (
+    ImageGenerationRequest,
+    ImageGenerationResponse,
+    ImageGenerationStreamEvent,
+    MediaGenerationTask,
+    TaskStatus,
+    VideoGenerationRequest,
+)
 from whero.vatbrain.core.resources import (
     FilePreprocessConfig,
     FileResource,
@@ -43,6 +53,14 @@ from whero.vatbrain.providers.volcengine.files import (
     from_volcengine_file_resource,
     to_volcengine_file_create_params,
     to_volcengine_file_list_params,
+)
+from whero.vatbrain.providers.volcengine.media import (
+    from_volcengine_image_response,
+    from_volcengine_image_stream_event,
+    from_volcengine_video_task,
+    from_volcengine_video_task_create_response,
+    to_volcengine_image_params,
+    to_volcengine_video_task_create_params,
 )
 from whero.vatbrain.providers.volcengine.mapper import (
     PROVIDER,
@@ -280,6 +298,300 @@ class VolcengineClient:
         async for event in stream:
             yield from_volcengine_stream_event(event, sequence=sequence)
             sequence += 1
+
+    def generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ImageGenerationResponse:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = self._create_image_response(
+            request,
+            message="Volcengine image generation request failed.",
+        )
+        return from_volcengine_image_response(response)
+
+    async def agenerate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ImageGenerationResponse:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = await self._acreate_image_response(
+            request,
+            message="Volcengine async image generation request failed.",
+        )
+        return from_volcengine_image_response(response)
+
+    def stream_generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> Iterator[ImageGenerationStreamEvent]:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        stream = self._create_image_stream(
+            request,
+            message="Volcengine stream image generation request failed.",
+        )
+        for sequence, event in enumerate(stream):
+            yield from_volcengine_image_stream_event(event, sequence=sequence)
+
+    async def astream_generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> AsyncIterator[ImageGenerationStreamEvent]:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        stream = await self._acreate_image_stream(
+            request,
+            message="Volcengine async stream image generation request failed.",
+        )
+        sequence = 0
+        async for event in stream:
+            yield from_volcengine_image_stream_event(event, sequence=sequence)
+            sequence += 1
+
+    def create_video_generation_task(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        duration_seconds: float | None = None,
+        ratio: str | None = None,
+        resolution: str | None = None,
+        generate_audio: bool | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        request = VideoGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            duration_seconds=duration_seconds,
+            ratio=ratio,
+            resolution=resolution,
+            generate_audio=generate_audio,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = self._create_video_task(
+            request,
+            message="Volcengine video generation task create request failed.",
+        )
+        return from_volcengine_video_task_create_response(response, model=request.model)
+
+    async def acreate_video_generation_task(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        duration_seconds: float | None = None,
+        ratio: str | None = None,
+        resolution: str | None = None,
+        generate_audio: bool | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        request = VideoGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            duration_seconds=duration_seconds,
+            ratio=ratio,
+            resolution=resolution,
+            generate_audio=generate_audio,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = await self._acreate_video_task(
+            request,
+            message="Volcengine async video generation task create request failed.",
+        )
+        return from_volcengine_video_task_create_response(response, model=request.model)
+
+    def get_video_generation_task(
+        self,
+        task_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        try:
+            response = self._sync_client.content_generation.tasks.get(
+                task_id=task_id,
+                **dict(provider_options or {}),
+            )
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine video generation task get request failed.",
+                "content_generation.tasks.get",
+                exc,
+            ) from exc
+        return from_volcengine_video_task(response)
+
+    async def aget_video_generation_task(
+        self,
+        task_id: str,
+        *,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        try:
+            response = await self._async_ark_client.content_generation.tasks.get(
+                task_id=task_id,
+                **dict(provider_options or {}),
+            )
+        except Exception as exc:
+            raise _provider_request_error(
+                "Volcengine async video generation task get request failed.",
+                "content_generation.tasks.get",
+                exc,
+            ) from exc
+        return from_volcengine_video_task(response)
+
+    def wait_for_video_generation_task(
+        self,
+        task_id: str,
+        *,
+        poll_interval: float = 10.0,
+        max_wait_seconds: float = 600.0,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        deadline = time.monotonic() + max_wait_seconds
+        terminal = {
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELED,
+            TaskStatus.EXPIRED,
+        }
+        while True:
+            task = self.get_video_generation_task(task_id, provider_options=provider_options)
+            if task.status in terminal:
+                return task
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Volcengine video generation task {task_id!r} did not finish "
+                    f"within {max_wait_seconds} seconds."
+                )
+            time.sleep(poll_interval)
+
+    async def await_video_generation_task(
+        self,
+        task_id: str,
+        *,
+        poll_interval: float = 10.0,
+        max_wait_seconds: float = 600.0,
+        provider_options: dict[str, Any] | None = None,
+    ) -> MediaGenerationTask:
+        deadline = time.monotonic() + max_wait_seconds
+        terminal = {
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELED,
+            TaskStatus.EXPIRED,
+        }
+        while True:
+            task = await self.aget_video_generation_task(task_id, provider_options=provider_options)
+            if task.status in terminal:
+                return task
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Volcengine video generation task {task_id!r} did not finish "
+                    f"within {max_wait_seconds} seconds."
+                )
+            await asyncio.sleep(poll_interval)
 
     def embed(
         self,
@@ -644,6 +956,48 @@ class VolcengineClient:
                 return await self._async_ark_client.responses.create(**retry_params)
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
+
+    def _create_image_response(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_image_params(request)
+        try:
+            return self._sync_client.images.generate(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "images.generate", exc) from exc
+
+    async def _acreate_image_response(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_image_params(request)
+        try:
+            return await self._async_ark_client.images.generate(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "images.generate", exc) from exc
+
+    def _create_image_stream(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_image_params(request, stream=True)
+        try:
+            return self._sync_client.images.generate(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "images.generate", exc) from exc
+
+    async def _acreate_image_stream(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_image_params(request, stream=True)
+        try:
+            return await self._async_ark_client.images.generate(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "images.generate", exc) from exc
+
+    def _create_video_task(self, request: VideoGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_video_task_create_params(request)
+        try:
+            return self._sync_client.content_generation.tasks.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "content_generation.tasks.create", exc) from exc
+
+    async def _acreate_video_task(self, request: VideoGenerationRequest, *, message: str) -> Any:
+        params = to_volcengine_video_task_create_params(request)
+        try:
+            return await self._async_ark_client.content_generation.tasks.create(**params)
+        except Exception as exc:
+            raise _provider_request_error(message, "content_generation.tasks.create", exc) from exc
 
     @property
     def _sync_client(self) -> Any:

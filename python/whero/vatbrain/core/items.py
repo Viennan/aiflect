@@ -102,11 +102,13 @@ class ImagePart:
     data: str | None = None
     mime_type: str | None = None
     detail: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     kind: Literal[PartKind.IMAGE] = PartKind.IMAGE
 
     def __post_init__(self) -> None:
         if bool(self.url) == bool(self.data):
             raise ValueError("ImagePart requires exactly one of url or data.")
+        object.__setattr__(self, "metadata", dict(self.metadata))
 
 
 @dataclass(frozen=True, slots=True)

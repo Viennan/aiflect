@@ -5,6 +5,7 @@ import pytest
 from whero.vatbrain import CapabilitySource
 from whero.vatbrain.core.capabilities import CapabilityValue, GenerationCapability
 from whero.vatbrain.providers.openai import OpenAIClient
+from whero.vatbrain.providers.volcengine import VolcengineClient
 
 
 def test_openai_adapter_capability_is_provider_level() -> None:
@@ -29,9 +30,35 @@ def test_openai_adapter_capability_is_provider_level() -> None:
     )
     assert capability.embedding is not None
     assert capability.embedding.sparse.value is False
+    assert capability.media_generation is not None
+    assert capability.media_generation.image_generation.value is True
+    assert capability.media_generation.video_generation.value is False
+    assert capability.media_generation.streaming.value is True
+    assert capability.media_generation.image_background_control.value is True
+    assert capability.media_generation.image_background_values.value == (
+        "auto",
+        "transparent",
+        "opaque",
+    )
     assert capability.tools is not None
     assert capability.tools.user_function_tools.value is True
     assert capability.tools.custom_tools.value is True
+
+
+def test_volcengine_adapter_capability_declares_media_generation() -> None:
+    client = VolcengineClient(client=object(), async_client=object())
+
+    capability = client.get_adapter_capability()
+
+    assert capability.provider == "volcengine"
+    assert capability.media_generation is not None
+    assert capability.media_generation.image_generation.value is True
+    assert capability.media_generation.video_generation.value is True
+    assert capability.media_generation.streaming.value is True
+    assert capability.media_generation.async_task.value is True
+    assert capability.media_generation.output_formats.value == ("png", "jpeg")
+    assert capability.media_generation.image_background_control.value is False
+    assert capability.media_generation.image_background_values.value == ()
 
 
 def test_model_capability_defaults_to_unknown_and_accepts_overrides() -> None:

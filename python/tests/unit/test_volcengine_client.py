@@ -8,10 +8,14 @@ from whero.vatbrain import (
     ClientConfig,
     FilePreprocessConfig,
     FileStatus,
+    ImagePart,
+    MediaKind,
     MessageItem,
     RemoteContextHint,
     RemoteContextInvalidBehavior,
     ReplayPolicy,
+    TaskStatus,
+    VideoPart,
 )
 from whero.vatbrain.core.errors import ProviderRequestError
 from whero.vatbrain.core.generation import StreamEventType
@@ -36,6 +40,20 @@ class AsyncFakeResponses:
     async def create(self, **kwargs: object) -> object:
         self.calls.append(kwargs)
         return self.result
+
+
+class AsyncFakeStream:
+    def __init__(self, items: list[object] | tuple[object, ...]) -> None:
+        self._items = iter(items)
+
+    def __aiter__(self) -> AsyncFakeStream:
+        return self
+
+    async def __anext__(self) -> object:
+        try:
+            return next(self._items)
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
 
 
 class FallbackResponses:
@@ -69,6 +87,28 @@ class FakeEmbeddings:
         return self.result
 
 
+class FakeImages:
+    def __init__(self, result: object) -> None:
+        self.result = result
+        self.calls: list[dict[str, object]] = []
+
+    def generate(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        return self.result
+
+
+class AsyncFakeImages:
+    def __init__(self, result: object) -> None:
+        self.result = result
+        self.calls: list[dict[str, object]] = []
+
+    async def generate(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        if kwargs.get("stream") is True and isinstance(self.result, (list, tuple)):
+            return AsyncFakeStream(self.result)
+        return self.result
+
+
 class FakeFiles:
     def __init__(self, file_obj: object) -> None:
         self.file_obj = file_obj
@@ -99,11 +139,70 @@ class FakeFiles:
         return self.file_obj
 
 
+class FakeTasks:
+    def __init__(self, *, create_result: object, get_results: list[object] | tuple[object, ...]) -> None:
+        self.create_result = create_result
+        self.get_results = list(get_results)
+        self.create_calls: list[dict[str, object]] = []
+        self.get_calls: list[dict[str, object]] = []
+
+    def create(self, **kwargs: object) -> object:
+        self.create_calls.append(kwargs)
+        return self.create_result
+
+    def get(self, **kwargs: object) -> object:
+        self.get_calls.append(kwargs)
+        if len(self.get_results) > 1:
+            return self.get_results.pop(0)
+        return self.get_results[0]
+
+
+class AsyncFakeTasks:
+    def __init__(self, *, create_result: object, get_results: list[object] | tuple[object, ...]) -> None:
+        self.create_result = create_result
+        self.get_results = list(get_results)
+        self.create_calls: list[dict[str, object]] = []
+        self.get_calls: list[dict[str, object]] = []
+
+    async def create(self, **kwargs: object) -> object:
+        self.create_calls.append(kwargs)
+        return self.create_result
+
+    async def get(self, **kwargs: object) -> object:
+        self.get_calls.append(kwargs)
+        if len(self.get_results) > 1:
+            return self.get_results.pop(0)
+        return self.get_results[0]
+
+
 class FakeArk:
-    def __init__(self, *, response: object, embedding: object, file_obj: object) -> None:
+    def __init__(
+        self,
+        *,
+        response: object,
+        embedding: object,
+        file_obj: object,
+        image: object | None = None,
+        task_create: object | None = None,
+        task_get: object | list[object] | tuple[object, ...] | None = None,
+    ) -> None:
         self.responses = FakeResponses(response)
         self.multimodal_embeddings = FakeEmbeddings(embedding)
         self.files = FakeFiles(file_obj)
+        self.images = FakeImages(image or SimpleNamespace(model="image-test", data=[], usage=None))
+        task_get_results: list[object] | tuple[object, ...]
+        if task_get is None:
+            task_get_results = [_raw_video_task()]
+        elif isinstance(task_get, (list, tuple)):
+            task_get_results = task_get
+        else:
+            task_get_results = [task_get]
+        self.content_generation = SimpleNamespace(
+            tasks=FakeTasks(
+                create_result=task_create or SimpleNamespace(id="task_1"),
+                get_results=task_get_results,
+            )
+        )
 
 
 class FakeArkFallback:
@@ -174,6 +273,37 @@ def _raw_file() -> SimpleNamespace:
     )
 
 
+def _raw_image_response() -> SimpleNamespace:
+    return SimpleNamespace(
+        model="doubao-image-test",
+        data=[SimpleNamespace(url="https://example.test/image.png", size="1024x1024")],
+        usage=SimpleNamespace(generated_images=1, output_tokens=2, total_tokens=3),
+        created_at=1_700_000_000,
+    )
+
+
+def _raw_video_task(status: str = "succeeded") -> SimpleNamespace:
+    return SimpleNamespace(
+        id="task_1",
+        model="doubao-video-test",
+        status=status,
+        error=None,
+        content=SimpleNamespace(
+            video_url="https://example.test/video.mp4",
+            file_url=None,
+            last_frame_url="https://example.test/last.png",
+        ),
+        usage=SimpleNamespace(completion_tokens=7, total_tokens=8),
+        created_at=1_700_000_000,
+        updated_at=1_700_000_010,
+        duration=5,
+        ratio="16:9",
+        resolution="1920x1080",
+        fileformat="mp4",
+        generate_audio=True,
+    )
+
+
 def test_client_generate_uses_ark_responses_endpoint() -> None:
     fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
     client = VolcengineClient(client=fake, async_client=object())
@@ -234,6 +364,285 @@ def test_client_stream_generate_maps_events() -> None:
     assert events[0].delta == "hi"
 
 
+def test_client_generate_image_uses_ark_images_endpoint() -> None:
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        image=_raw_image_response(),
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+
+    response = client.generate_image(
+        model="doubao-image-test",
+        prompt="a small robot",
+        input_items=[
+            MessageItem.user(
+                [
+                    ImagePart(url="https://example.test/ref1.png"),
+                    ImagePart(data="aGVsbG8=", mime_type="image/png"),
+                ]
+            )
+        ],
+        output_format="png",
+        response_format="url",
+        count=2,
+        quality="high",
+        background="transparent",
+        watermark=False,
+    )
+
+    call = fake.images.calls[0]
+    assert call["model"] == "doubao-image-test"
+    assert call["prompt"] == "a small robot"
+    assert call["image"] == [
+        "https://example.test/ref1.png",
+        "data:image/png;base64,aGVsbG8=",
+    ]
+    assert "size" not in call
+    assert call["output_format"] == "png"
+    assert call["response_format"] == "url"
+    assert call["watermark"] is False
+    assert call["sequential_image_generation_options"] == {"max_images": 2}
+    assert "quality" not in call
+    assert "background" not in call
+    assert "extra_body" not in call
+    assert response.artifacts[0].kind == MediaKind.IMAGE
+    assert response.artifacts[0].url == "https://example.test/image.png"
+    assert response.artifacts[0].width == 1024
+    assert response.usage is not None
+    assert response.usage.metadata["generated_images"] == 1
+
+
+def test_client_stream_generate_image_maps_ark_events() -> None:
+    stream = [
+        SimpleNamespace(
+            type="image_generation.partial_succeeded",
+            model="doubao-image-test",
+            url="https://example.test/partial.png",
+            size="512x512",
+            image_index=0,
+        ),
+        SimpleNamespace(
+            type="image_generation.partial_failed",
+            model="doubao-image-test",
+            image_index=1,
+            error=SimpleNamespace(code="OutputImageSensitiveContentDetected", message="blocked"),
+        ),
+        SimpleNamespace(
+            type="image_generation.completed",
+            model="doubao-image-test",
+            usage=SimpleNamespace(generated_images=1, output_tokens=2, total_tokens=3),
+        ),
+    ]
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        image=stream,
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+
+    events = list(client.stream_generate_image(model="doubao-image-test", prompt="a small robot"))
+
+    assert fake.images.calls[0]["stream"] is True
+    assert events[0].type == "image.partial"
+    assert events[0].artifact is not None
+    assert events[0].artifact.url == "https://example.test/partial.png"
+    assert events[1].type == "image.failed"
+    assert events[1].error == "OutputImageSensitiveContentDetected: blocked"
+    assert events[2].type == "image.completed"
+    assert events[2].usage is not None
+    assert events[2].usage.total_tokens == 3
+
+
+def test_client_generate_image_defaults_to_watermark() -> None:
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        image=_raw_image_response(),
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+
+    client.generate_image(model="doubao-image-test", prompt="a small robot")
+
+    assert fake.images.calls[0]["watermark"] is True
+
+
+def test_client_video_generation_task_methods_use_ark_content_generation() -> None:
+    task_get = _raw_video_task(status="succeeded")
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        task_create=SimpleNamespace(id="task_1", safety_identifier="safe_1"),
+        task_get=task_get,
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+
+    created = client.create_video_generation_task(
+        model="doubao-video-test",
+        prompt="a robot walks",
+        input_items=[
+            MessageItem.user(
+                [
+                    ImagePart(url="https://example.test/ref.png"),
+                    ImagePart(
+                        url="https://example.test/first.png",
+                        metadata={"role": "first_frame"},
+                    ),
+                    VideoPart(url="https://example.test/ref.mp4", fps=2.0),
+                ]
+            )
+        ],
+        duration_seconds=5,
+        ratio="16:9",
+        resolution="1080p",
+        generate_audio=True,
+        watermark=False,
+    )
+    retrieved = client.get_video_generation_task("task_1")
+
+    create_call = fake.content_generation.tasks.create_calls[0]
+    assert created.id == "task_1"
+    assert created.status == TaskStatus.QUEUED
+    assert created.metadata["safety_identifier"] == "safe_1"
+    assert create_call["model"] == "doubao-video-test"
+    assert create_call["duration"] == 5
+    assert create_call["ratio"] == "16:9"
+    assert create_call["resolution"] == "1080p"
+    assert create_call["generate_audio"] is True
+    assert create_call["watermark"] is False
+    assert create_call["content"] == [
+        {"type": "text", "text": "a robot walks"},
+        {
+            "type": "image_url",
+            "image_url": {"url": "https://example.test/ref.png"},
+            "role": "reference_image",
+        },
+        {
+            "type": "image_url",
+            "image_url": {"url": "https://example.test/first.png"},
+            "role": "first_frame",
+        },
+        {
+            "type": "video_url",
+            "video_url": {"url": "https://example.test/ref.mp4", "fps": 2.0},
+            "role": "reference_video",
+        },
+    ]
+    assert fake.content_generation.tasks.get_calls[0] == {"task_id": "task_1"}
+    assert retrieved.status == TaskStatus.COMPLETED
+    assert retrieved.artifacts[0].kind == MediaKind.VIDEO
+    assert retrieved.artifacts[0].url == "https://example.test/video.mp4"
+    assert retrieved.artifacts[1].kind == MediaKind.IMAGE
+    assert retrieved.artifacts[1].url == "https://example.test/last.png"
+    assert retrieved.metadata["usage"].total_tokens == 8
+
+
+def test_client_wait_for_video_generation_task_polls_until_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        task_get=[
+            _raw_video_task(status="queued"),
+            _raw_video_task(status="running"),
+            _raw_video_task(status="succeeded"),
+        ],
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.sleep", lambda _: None)
+
+    task = client.wait_for_video_generation_task("task_1", poll_interval=0.1, max_wait_seconds=5)
+
+    assert task.status == TaskStatus.COMPLETED
+    assert len(fake.content_generation.tasks.get_calls) == 3
+
+
+def test_client_create_video_generation_task_defaults_to_watermark() -> None:
+    fake = FakeArk(
+        response=_raw_response(),
+        embedding=_raw_embedding(),
+        file_obj=_raw_file(),
+        task_create=SimpleNamespace(id="task_1"),
+    )
+    client = VolcengineClient(client=fake, async_client=object())
+
+    client.create_video_generation_task(
+        model="doubao-video-test",
+        prompt="a robot walks",
+    )
+
+    assert fake.content_generation.tasks.create_calls[0]["watermark"] is True
+
+
+@pytest.mark.anyio
+async def test_async_client_generate_image_uses_ark_images_endpoint() -> None:
+    fake_async = SimpleNamespace(
+        images=AsyncFakeImages(_raw_image_response()),
+    )
+    client = VolcengineClient(client=object(), async_client=fake_async)
+
+    response = await client.agenerate_image(
+        model="doubao-image-test",
+        prompt="a small robot",
+        response_format="url",
+    )
+
+    assert fake_async.images.calls[0]["model"] == "doubao-image-test"
+    assert fake_async.images.calls[0]["response_format"] == "url"
+    assert fake_async.images.calls[0]["watermark"] is True
+    assert response.artifacts[0].url == "https://example.test/image.png"
+
+
+@pytest.mark.anyio
+async def test_async_client_stream_generate_image_maps_ark_events() -> None:
+    stream = [
+        SimpleNamespace(type="image_generation.generating", b64_json="abc", image_index=0),
+        SimpleNamespace(type="image_generation.completed"),
+    ]
+    fake_async = SimpleNamespace(images=AsyncFakeImages(stream))
+    client = VolcengineClient(client=object(), async_client=fake_async)
+
+    events = [
+        event
+        async for event in client.astream_generate_image(
+            model="doubao-image-test",
+            prompt="a small robot",
+        )
+    ]
+
+    assert fake_async.images.calls[0]["stream"] is True
+    assert events[0].type == "image.partial"
+    assert events[0].artifact is not None
+    assert events[0].artifact.data == "abc"
+
+
+@pytest.mark.anyio
+async def test_async_client_video_generation_task_methods_use_ark_content_generation() -> None:
+    fake_tasks = AsyncFakeTasks(
+        create_result=SimpleNamespace(id="task_async"),
+        get_results=[_raw_video_task(status="succeeded")],
+    )
+    fake_async = SimpleNamespace(content_generation=SimpleNamespace(tasks=fake_tasks))
+    client = VolcengineClient(client=object(), async_client=fake_async)
+
+    created = await client.acreate_video_generation_task(
+        model="doubao-video-test",
+        prompt="a robot walks",
+        duration_seconds=5,
+    )
+    retrieved = await client.aget_video_generation_task("task_async")
+
+    assert created.id == "task_async"
+    assert fake_tasks.create_calls[0]["duration"] == 5
+    assert fake_tasks.create_calls[0]["watermark"] is True
+    assert fake_tasks.get_calls[0] == {"task_id": "task_async"}
+    assert retrieved.status == TaskStatus.COMPLETED
+
+
 def test_client_embed_uses_multimodal_embeddings_endpoint() -> None:
     fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
     client = VolcengineClient(client=fake, async_client=object())
@@ -243,11 +652,15 @@ def test_client_embed_uses_multimodal_embeddings_endpoint() -> None:
         inputs=["hello"],
         instructions="query",
         sparse_embedding=False,
+        provider_options={"trace_id": "trace-1"},
     )
 
     assert fake.multimodal_embeddings.calls[0]["model"] == "doubao-embedding-test"
     assert fake.multimodal_embeddings.calls[0]["input"] == [{"type": "text", "text": "hello"}]
-    assert fake.multimodal_embeddings.calls[0]["extra_body"] == {"instructions": "query"}
+    assert fake.multimodal_embeddings.calls[0]["extra_body"] == {
+        "instructions": "query",
+        "trace_id": "trace-1",
+    }
     assert fake.multimodal_embeddings.calls[0]["sparse_embedding"] == {"type": "disabled"}
     assert response.vectors[0].dense == [1.0, 2.0]
 

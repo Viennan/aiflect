@@ -1,12 +1,12 @@
 # Python 实现状态
 
-状态：v0.4 已完成
+状态：v0.5 已完成
 日期：2026-05-05
-最近更新：2026-05-28
+最近更新：2026-05-29
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volcengine adapter MVP，在 v0.3 core 抽象基础上验证了第二个 provider、Files API 与多模态 embedding。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media Generation，在 v0.4 Volcengine adapter MVP 基础上接入 OpenAI Images API、Volcengine Ark Images API 与 Volcengine Content Generation 视频任务。
 
 核心文档：
 
@@ -15,6 +15,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
 - [design/provider-native-replay.CN.md](design/provider-native-replay.CN.md)
 - [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md)
 - [impls/python/volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)
+- [impls/python/v0.5-media-generation.CN.md](impls/python/v0.5-media-generation.CN.md)
 - [impls/python/v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)
 - [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)
 - [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)
@@ -51,6 +52,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
   - `FileUploadRequest`、`FileResource`、`FileStatus`、`FilePreprocessConfig(video_fps/provider_options)`。
 - `core.media`：
   - `MediaArtifact`、`ImageGenerationRequest`、`ImageGenerationResponse`、`ImageGenerationStreamEvent`、`MediaGenerationTask`。
+  - `ImageGenerationRequest` 不包含 `tools`；media generation 不复用 generation function tool 模型。
 - `core.tools`：
   - `FunctionToolSpec` / `ToolSpec`。
   - `FunctionToolType(function | custom)`。
@@ -95,6 +97,15 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
   - optimized attempt 发送 suffix。
   - previous response 失效 fallback 重新构造完整 input。
 - OpenAI text embeddings。
+- OpenAI Images API：
+  - `generate_image()` / `agenerate_image()`。
+  - `stream_generate_image()` / `astream_generate_image()`。
+  - 无参考图时调用 `images.generate`。
+  - 存在 `ImagePart(data=...)` 参考图时调用 `images.edit`。
+  - 不通过 Responses API hosted image generation tool 间接生成图片。
+  - 不隐式下载 URL 参考图；OpenAI edit 路径要求显式图片内容。
+  - `background` 映射到 OpenAI Images API，capability 声明支持 `auto`、`transparent`、`opaque`。
+  - normalized `watermark` 被忽略，不发送给 OpenAI Images API。
 - Adapter/model capability 查询与用户覆写。
 
 ### Pydantic Structured Output
@@ -118,6 +129,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
   - `responses.create`。
   - `files.create/retrieve/list/delete/wait_for_processing`。
   - `multimodal_embeddings.create`。
+  - `images.generate`。
+  - `content_generation.tasks.create/get`。
 - 未使用火山方舟 OpenAI-compatible SDK surface，未把 OpenAI SDK 配置为火山方舟 base URL，未引入 direct HTTP fallback。
 - Responses generation：
   - text/image/video/file input。
@@ -139,9 +152,26 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
   - text/image/video mixed input。
   - `instructions` 通过 Ark SDK `extra_body` 传递。
   - dimensions、encoding_format、dense/sparse vector 与 usage mapping。
+  - `sparse_embedding` 仅允许纯文本输入；混合图片/视频时会抛 `UnsupportedCapabilityError`。
   - v0.4 每次 embedding request 只提交一个 `EmbeddingInput`，与 Ark 多模态接口“一次返回一个向量”的语义一致。
+- Ark Images API：
+  - `generate_image()` / `agenerate_image()`。
+  - `stream_generate_image()` / `astream_generate_image()`。
+  - text-to-image 与 reference image 均统一映射到 `Ark.images.generate`。
+  - 支持 URL/base64 data 参考图、output_format、response_format 与 provider_options。
+  - 图片分辨率/长宽比不作为 normalized `size` 字段暴露，默认由模型从 prompt 推断。
+  - `watermark` 映射到 Ark `images.generate` 同名参数，默认 `True`。
+  - `count` 映射到 Ark `sequential_image_generation_options.max_images`；`sequential_image_generation` 等组图开关通过 `provider_options` 传递。
+  - `background` 与 `quality` 当前无 Ark Images API 等价字段，adapter 忽略，capability 声明背景控制不支持。
+- Ark Content Generation 视频任务：
+  - `create_video_generation_task()` / `acreate_video_generation_task()`。
+  - `get_video_generation_task()` / `aget_video_generation_task()`。
+  - `wait_for_video_generation_task()` / `await_video_generation_task()`。
+  - 支持 text/image/video/audio reference content 的最小映射。
+  - `watermark` 映射到 Ark task create 同名参数，默认 `True`。
+  - 支持 task status、artifact、error 与 usage metadata 映射。
 - Capability：
-  - adapter capability 声明 generation/streaming/async/function tools/files/multimodal embedding/sparse embedding/usage。
+  - adapter capability 声明 generation/streaming/async/function tools/files/multimodal embedding/sparse embedding/media generation/usage。
   - model capability 默认 unknown，支持用户 overrides。
 
 ## 暂不实现
@@ -158,12 +188,11 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.4 Volceng
 - JSON mode / `json_object` structured output 兼容。
 - 跨 provider replay。
 
-## 已规划，待实现
+## 后续规划
 
 ### 后续阶段
 
-- Media generation provider implementation。
-- Provider-hosted tools 专门设计。
+- Provider-hosted tools 专门设计留待后续阶段。
 - Provider capability matrix。
 - 可选真实 API integration tests。
 - API reference 与 migration notes 持续完善。
@@ -188,4 +217,4 @@ cd python
 ./.venv/bin/python -m pytest
 ```
 
-当前 v0.4 基线：`123 passed`。
+当前 v0.5 基线：`161 passed`。

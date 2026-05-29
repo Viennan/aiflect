@@ -1,7 +1,7 @@
 # vatbrain 知识库索引
 
 状态：持续维护
-最近更新：2026-05-28
+最近更新：2026-05-29
 
 ## Design
 
@@ -13,22 +13,23 @@
 ## Third-party References
 
 - [3rds/INDEX.md](3rds/INDEX.md)：第三方资料总索引，说明外部厂商资料在知识库中的定位。
-- [3rds/volengine/INDEX.md](3rds/volengine/INDEX.md)：火山方舟资料索引，归纳 Responses、Responses API 专题教程、Chat、Files、多模态 embedding、图片/视频理解、图片/视频生成、结构化输出、函数调用、reasoning 与 streaming。
+- [3rds/volengine/INDEX.md](3rds/volengine/INDEX.md)：火山方舟资料索引，归纳 Responses、Responses API 专题教程与详细参数 reference、Chat、Files 与 file object reference、多模态 embedding API reference、图片/视频理解、图片/视频生成及 API reference、结构化输出、函数调用、reasoning 与 streaming。
 
 ## Impls
 
 - [impls/python/openai-adapter.CN.md](impls/python/openai-adapter.CN.md)：Python OpenAI adapter 实现方案，描述首个 provider adapter 的范围、核心模型、OpenAI 映射、测试策略与实现步骤。
-- [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md)：Python 版本演进方案，记录 v0.4 Volcengine adapter MVP 已完成后的阶段基线，并规划 v0.5 hosted tools/media generation 和 v0.6 稳定化路线。
+- [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md)：Python 版本演进方案，记录 v0.5 Media Generation 已完成后的阶段基线，并规划 v0.6 稳定化路线。
+- [impls/python/v0.5-media-generation.CN.md](impls/python/v0.5-media-generation.CN.md)：Python v0.5 Media Generation 方案与实现记录，明确 hosted tools 暂不进入范围，基于 OpenAI Images API 与 Volcengine Ark Images/Content Generation 完成通用图片生成、参考图生成、图片流式生成、视频异步任务和图片/视频 AI 水印控制。
 - [impls/python/volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)：Python v0.4 Volcengine adapter MVP 详细方案与实现记录，定义 provider identity、Ark SDK-only 调用边界、Responses generation/streaming、Files API、多模态 embedding、capability、replay、测试与验收结果。
 - [impls/python/v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)：Python v0.2 Responses Contract Hardening 设计方案，细化 OpenAI Responses API 参数映射、structured output、streaming event、stream accumulator、错误映射与验收测试。
 - [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)：Python v0.3 Core API Family Expansion 实现基线，系统说明 items、generation、embedding、resources、media、function/custom tools、capabilities、OpenAI adapter、Pydantic helper 与 replay 的已实现边界。
 - [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)：Python Pydantic Structured Output 便捷层方案与实现记录，说明可选 Pydantic v2 helper、strict schema 生成、最终响应解析、client convenience 与测试策略。
-- [impls/python/STATUS.md](impls/python/STATUS.md)：Python 实现状态，记录 v0.4 当前基线、OpenAI/Volcengine adapter 已实现范围、暂不实现项、后续阶段和验证方式。
+- [impls/python/STATUS.md](impls/python/STATUS.md)：Python 实现状态，记录 v0.5 当前基线、OpenAI/Volcengine adapter 已实现范围、暂不实现项、后续阶段和验证方式。
 
 ## User Docs
 
-- [user/python/quickstart.CN.md](user/python/quickstart.CN.md)：Python 快速开始，按渐进路径说明 OpenAI/Volcengine client、generation、remote context/replay、streaming、structured output、工具调用、embedding、capability 和错误处理。
-- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)：Python API 参考，完整覆盖当前暴露给用户的 core 数据结构、枚举、provider client、structured output helper、capability、usage、错误类型和 OpenAI/Volcengine adapter 支持范围。
-- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，说明 Ark SDK-only 安装、generation、streaming、Files API、多模态 embedding、function tools、remote context 和限制。
+- [user/python/quickstart.CN.md](user/python/quickstart.CN.md)：Python 快速开始，按渐进路径说明 OpenAI/Volcengine client、generation、remote context/replay、streaming、图片/视频生成、structured output、工具调用、embedding、capability 和错误处理。
+- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)：Python API 参考，完整覆盖当前暴露给用户的 core 数据结构、枚举、provider client、structured output helper、capability、usage、错误类型、媒体生成水印控制和 OpenAI/Volcengine adapter 支持范围。
+- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，说明 Ark SDK-only 安装、generation、streaming、图片生成、视频任务、Files API、多模态 embedding、function tools、remote context 和限制。
 - [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)：Python Pydantic Structured Output 编程模型，说明 Pydantic helper、client convenience、strict schema、错误处理与流式限制。
 - [user/python/STATUS.md](user/python/STATUS.md)：Python 用户文档状态，记录当前文档结构、已覆盖 public surface、后续维护规则和待完善项。

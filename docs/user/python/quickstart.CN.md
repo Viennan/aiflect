@@ -1,8 +1,8 @@
 # Python 快速开始
 
-状态：v0.4
+状态：v0.5
 日期：2026-05-05
-最近更新：2026-05-28
+最近更新：2026-05-29
 
 ## 读者路径
 
@@ -243,6 +243,86 @@ for event in client.stream_generate(
 response = accumulator.to_response()
 ```
 
+## 图片与视频生成
+
+图片生成是独立入口，不并入 `generate()`。OpenAI adapter 使用直接 Images API；Volcengine adapter 使用 Ark SDK 原生 Images API。
+
+```python
+response = client.generate_image(
+    model="gpt-image-1",
+    prompt="A clean product photo on a walnut desk.",
+    output_format="png",
+    response_format="b64_json",
+)
+
+for artifact in response.artifacts:
+    print(artifact.url or artifact.data)
+```
+
+参考图生成仍使用同一个 `generate_image()` 入口。OpenAI adapter 会根据 `input_items` 中是否存在参考图自动选择 `images.generate` 或 `images.edit`；Volcengine adapter 统一映射到 Ark `images.generate`。
+
+```python
+from whero.vatbrain import ImagePart, MessageItem
+
+response = client.generate_image(
+    model="gpt-image-1",
+    prompt="Restyle this image as a studio product photo.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(data="data:image/png;base64,..."),
+        ])
+    ],
+)
+```
+
+`ImageGenerationRequest` 不包含 `tools`。Provider 原生媒体生成开关通过 `provider_options` 传递；v0.5 不使用 OpenAI Responses API hosted image generation tool，也不暴露 provider-hosted tools 的稳定 helper。OpenAI edit 路径不会隐式下载 `ImagePart(url=...)`，需要参考图时应传入显式图片内容。
+
+图片生成不提供 normalized `size` 参数。不同 provider 和模型的分辨率枚举差异较大，默认让模型从 prompt 中感知目标分辨率、长宽比和构图规格；确实需要 provider-native 控制时，用 `provider_options` 显式传递。
+
+`background` 是 provider capability：OpenAI 支持 `auto`、`transparent`、`opaque`，Volcengine 当前不支持，adapter 会忽略。可通过 `client.get_adapter_capability().media_generation.image_background_control` 检查。
+
+图片与视频生成请求都提供 `watermark` 参数，默认 `True`，用于要求 provider 添加 AI 水印；provider 或模型没有可控水印能力时该参数会被忽略。
+
+图片流式生成：
+
+```python
+for event in client.stream_generate_image(
+    model="gpt-image-1",
+    prompt="A cinematic product photo.",
+    provider_options={"partial_images": 2},
+):
+    if event.artifact:
+        print(event.type, event.artifact.url or event.artifact.data)
+```
+
+Volcengine adapter 额外支持 Ark Content Generation 视频任务：
+
+```python
+from whero.vatbrain import ImagePart, MessageItem, VideoPart
+
+task = volcengine_client.create_video_generation_task(
+    model="doubao-seedance-2-0-260128",
+    prompt="A short cinematic clip of a product turntable.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(url="https://example.test/product.png"),
+            VideoPart(url="https://example.test/motion-reference.mp4", fps=2.0),
+        ])
+    ],
+    duration_seconds=8,
+    ratio="16:9",
+    watermark=False,
+    provider_options={"return_last_frame": True},
+)
+
+task = volcengine_client.wait_for_video_generation_task(task.id)
+print(task.status, task.artifacts)
+```
+
+`input_items` 可携带参考图片、参考视频、参考音频或带 media type 的文件引用，也可额外放入 `TextPart` 补充局部说明。Volcengine adapter 会把这些 part 映射为 Ark Content Generation task 的 reference content；`metadata["role"]` 可用于传递 `first_frame`、`last_frame`、`reference_image` 等 provider-native role。视频任务的 `provider_options` 可传 Ark 原生参数，例如 `return_last_frame`、`seed`、`frames`、`callback_url`、`service_tier`、`execution_expires_after`、`draft`、`priority`、`safety_identifier`。
+
+异步入口分别是 `agenerate_image()`、`astream_generate_image()`、`acreate_video_generation_task()`、`aget_video_generation_task()` 和 `await_video_generation_task()`。
+
 ## Structured Output
 
 `vatbrain` 只支持 JSON Schema structured output，不兼容 JSON mode / `json_object`。
@@ -454,7 +534,7 @@ embedding = await client.aembed(
 )
 ```
 
-当前 OpenAI adapter 只支持 text embedding。v0.3 core 已能表达多模态 embedding、instructions 和 sparse vectors，主要服务后续 provider adapter：
+当前 OpenAI adapter 只支持 text embedding。Volcengine adapter 支持单样本多模态 embedding、instructions、dense vector；稀疏向量只支持纯文本输入：
 
 ```python
 from whero.vatbrain import EmbeddingInput, ImagePart
@@ -465,9 +545,11 @@ sample = EmbeddingInput(
 )
 ```
 
+需要 Volcengine sparse embedding 时，使用纯文本样本并设置 `sparse_embedding=True`。
+
 ## Core Models 边界
 
-v0.3 新增音频、视频、文件、reasoning、resource/file 和 media artifact/task 的 core 模型。这些模型用于稳定跨 provider 语义，不代表当前 OpenAI adapter 已全部支持。
+当前 core 包含音频、视频、文件、reasoning、resource/file 和 media artifact/task 模型。这些模型用于稳定跨 provider 语义，不代表每个 adapter 都已全部支持。
 
 ```python
 from whero.vatbrain import FilePart, MessageItem, VideoPart
@@ -555,10 +637,12 @@ except ProviderRequestError as exc:
 ## 当前限制
 
 - 已实现 OpenAI 与 Volcengine provider。
-- OpenAI / Volcengine generation 都使用 Responses API，不提供 Chat Completions fallback。
+- OpenAI / Volcengine 文本 generation 都使用 Responses API，不提供 Chat Completions fallback。
 - Volcengine adapter 只使用 Ark SDK 原生 surface，不使用 OpenAI-compatible surface。
 - OpenAI embedding 仅支持文本输入；Volcengine embedding 支持单样本多模态输入。
-- v0.3 新增的 audio/video/file/reasoning/resource/media 模型主要是 core 表达层，不代表每个 adapter 都已全部映射。
+- OpenAI 图片生成只覆盖直接 Images API，不覆盖通过 Responses API hosted image generation tool 的间接路径。
+- Volcengine 图片生成使用 Ark Images API；视频生成使用 Ark Content Generation task。
+- audio/video/file/reasoning/resource/media 模型不代表每个 adapter 都已全部映射。
 - Streaming event 已覆盖 OpenAI / Volcengine Responses API 的主要 lifecycle、text、tool call、reasoning summary 与错误事件；未知事件会 raw passthrough。
 - Capability 不维护内部权威模型能力表。
 - 不提供 routing、fallback、自动模型选择、自动工具执行或 agent loop。

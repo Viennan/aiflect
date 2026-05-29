@@ -205,10 +205,12 @@ ToolCallConfig.tool_choice -> tool_choice, if supported by Ark SDK surface
 RemoteContextHint.previous_response_id -> previous_response_id
 RemoteContextHint.store -> store
 RemoteContextHint.provider_options -> provider-native remote context params
-GenerationRequest.provider_options -> top-level provider-native params
+GenerationRequest.provider_options -> Ark SDK params or request-body extra_body
 ```
 
 停止序列不进入 `GenerationConfig`；如目标 Ark API 支持某个原生扩展字段，应由用户通过 `provider_options` 明确传递。
+
+Ark SDK Python surface 并不是任意 `**kwargs` 请求体透传。adapter 会把 Ark SDK `responses.create` 已显式支持的字段直接作为方法参数传入；对于 Responses API 文档中存在但当前 SDK 签名未直接暴露的请求体字段（例如 `include`、`context_management`、`metadata`），会合并到 SDK `extra_body`。
 
 `provider_options` 的推荐用途：
 
@@ -242,11 +244,13 @@ GenerationRequest.provider_options -> top-level provider-native params
 - 映射为 `function_call_output`。
 - `call_id` 必须与模型输出的 function call 对齐。
 - `output` 保持字符串，由用户负责序列化工具结果。
+- `metadata["status"]` 可映射为 Ark `function_call_output.status`，用于保留 provider-native replay 状态。
 
 `ReasoningItem`：
 
 - 若存在 provider-native snapshot，replay 时优先使用 snapshot。
-- 若缺少 snapshot，normalized mapper 暂不主动构造 reasoning input，除非 Volcengine Responses API 明确支持回传 normalized reasoning item。`require_provider_native` 模式下缺 snapshot 应失败。
+- 若缺少 snapshot，可根据 Responses API reference 中的 `type="reasoning"` / `summary=[{"type":"summary_text"}]` 结构构造 normalized reasoning input。
+- 加密原文 `reasoning.encrypted_content` 仍属于 provider-native 字段，通过 `provider_options` / snapshot 保真，不提升为 core 字段。
 
 ### Remote Context 与差分传输
 
@@ -484,8 +488,8 @@ inputs[0].parts -> provider input content list
 instructions -> extra_body.instructions
 dimensions -> dimensions, if provider model supports it
 encoding_format -> encoding_format
-sparse_embedding -> request sparse vector, if provider surface supports it
-provider_options -> top-level native params
+sparse_embedding -> sparse_embedding.type, text-only
+provider_options -> Ark SDK params or request-body extra_body
 ```
 
 Input 样本：
@@ -495,6 +499,7 @@ Input 样本：
 - `VideoPart(url=...)` / `VideoPart(data=...)` -> video input。
 - `VideoPart(file_id=...)`、`FilePart`、audio part 暂不支持 embedding 映射。
 - tool call/result/reasoning item 不属于 embedding-compatible 输入。
+- `sparse_embedding` 仅支持纯文本输入；包含图片或视频时 adapter 应抛 `UnsupportedCapabilityError`，避免发送 provider 会拒绝或语义不明确的请求。
 
 Ark 多模态 embedding API 以“一个样本包含多个 content part”表达多模态输入，并一次返回一个向量。v0.4 因此要求每次 request 只包含一个 `EmbeddingInput`；如需处理多个样本，应由用户代码循环调用，adapter 不会静默合并或拆分样本边界。
 

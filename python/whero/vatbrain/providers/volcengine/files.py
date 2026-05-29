@@ -137,9 +137,11 @@ def _preprocess_from_raw(value: Any) -> FilePreprocessConfig | None:
 
 
 def _status_from_volcengine(status: Any) -> FileStatus:
-    if status == "active":
+    if status in {"active", "processed", "ready", "success"}:
         return FileStatus.READY
-    if status == "processing":
+    if status == "uploaded":
+        return FileStatus.UPLOADED
+    if status in {"processing", "in_progress"}:
         return FileStatus.PROCESSING
     if status == "failed":
         return FileStatus.FAILED

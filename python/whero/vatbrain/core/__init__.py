@@ -62,6 +62,7 @@ from whero.vatbrain.core.media import (
     MediaGenerationTask,
     MediaKind,
     TaskStatus,
+    VideoGenerationRequest,
 )
 from whero.vatbrain.core.resources import (
     FilePreprocessConfig,
@@ -139,6 +140,7 @@ __all__ = [
     "ToolExecutionOwner",
     "ToolSpec",
     "Usage",
+    "VideoGenerationRequest",
     "VideoPart",
     "provider_snapshot_for",
     "provider_snapshot_key",

@@ -25,7 +25,7 @@ from whero.vatbrain import (
     ToolSpec,
     VideoPart,
 )
-from whero.vatbrain.core.errors import InvalidItemError, UnsupportedCapabilityError
+from whero.vatbrain.core.errors import UnsupportedCapabilityError
 from whero.vatbrain.providers.volcengine.mapper import (
     from_volcengine_generation_response,
     to_volcengine_generation_params,
@@ -105,6 +105,36 @@ def test_generation_request_maps_ark_responses_params() -> None:
     assert params["text"]["format"]["strict"] is True
 
 
+def test_generation_request_routes_sdk_unknown_body_fields_to_extra_body() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            provider_options={
+                "expire_at": 1_800_000_000,
+                "context_management": {"edits": [{"type": "clear_thinking"}]},
+            }
+        ),
+        provider_options={
+            "include": ["reasoning.encrypted_content"],
+            "metadata": {"trace_id": "trace-1"},
+            "service_tier": "fast",
+            "extra_body": {"custom_flag": True},
+        },
+    )
+
+    params = to_volcengine_generation_params(request)
+
+    assert params["expire_at"] == 1_800_000_000
+    assert params["service_tier"] == "fast"
+    assert params["extra_body"] == {
+        "context_management": {"edits": [{"type": "clear_thinking"}]},
+        "include": ["reasoning.encrypted_content"],
+        "metadata": {"trace_id": "trace-1"},
+        "custom_flag": True,
+    }
+
+
 def test_generation_mapper_can_replay_without_remote_context() -> None:
     request = GenerationRequest(
         model="doubao-test",
@@ -129,15 +159,59 @@ def test_generation_mapper_rejects_custom_tools() -> None:
         to_volcengine_generation_params(custom_tool_request)
 
 
-def test_generation_mapper_requires_reasoning_provider_snapshot_for_replay() -> None:
+def test_generation_mapper_can_replay_normalized_reasoning_summary() -> None:
     request = GenerationRequest(
         model="doubao-test",
-        items=[ReasoningItem(summary="prior thinking")],
+        items=[ReasoningItem(id="rs_1", summary="prior thinking", status="completed")],
         replay_policy=ReplayPolicy(mode=ReplayMode.NORMALIZED_ONLY),
     )
 
-    with pytest.raises(InvalidItemError, match="reasoning replay"):
-        to_volcengine_generation_params(request)
+    params = to_volcengine_generation_params(request)
+
+    assert params["input"] == [
+        {
+            "type": "reasoning",
+            "summary": [{"type": "summary_text", "text": "prior thinking"}],
+            "id": "rs_1",
+            "status": "completed",
+        }
+    ]
+
+
+def test_generation_mapper_maps_partial_assistant_message_metadata() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem("assistant", "def bubble_sort(arr):", metadata={"partial": True})],
+    )
+
+    params = to_volcengine_generation_params(request)
+
+    assert params["input"][0]["role"] == "assistant"
+    assert params["input"][0]["partial"] is True
+
+
+def test_generation_mapper_maps_function_result_status_metadata() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[
+            FunctionResultItem(
+                call_id="call_1",
+                output='{"ok":true}',
+                metadata={"status": "completed"},
+            )
+        ],
+    )
+
+    params = to_volcengine_generation_params(request)
+
+    assert params["input"] == [
+        {
+            "type": "function_call_output",
+            "call_id": "call_1",
+            "output": '{"ok":true}',
+            "status": "completed",
+        }
+    ]
 
 
 def test_generation_response_maps_reasoning_function_call_output_and_snapshots() -> None:
@@ -178,6 +252,7 @@ def test_generation_response_maps_reasoning_function_call_output_and_snapshots()
             output_tokens=5,
             total_tokens=15,
             output_tokens_details=SimpleNamespace(reasoning_tokens=2),
+            tool_usage=SimpleNamespace(function_calls=1),
         ),
     )
 
@@ -192,6 +267,7 @@ def test_generation_response_maps_reasoning_function_call_output_and_snapshots()
     assert isinstance(mapped.output_items[3], FunctionResultItem)
     assert mapped.usage is not None
     assert mapped.usage.reasoning_tokens == 2
+    assert mapped.usage.metadata["tool_usage"] == {"function_calls": 1}
 
     replay_params = to_volcengine_generation_params(
         GenerationRequest(model="doubao-test", items=[mapped.output_items[0]])

@@ -9,7 +9,6 @@ from typing import Any, Iterable
 
 from whero.vatbrain.core.generation import StreamOptions
 from whero.vatbrain.core.items import Item
-from whero.vatbrain.core.tools import ToolSpec
 from whero.vatbrain.core.usage import Usage
 
 
@@ -63,11 +62,12 @@ class ImageGenerationRequest:
     model: str
     prompt: str
     input_items: tuple[Item, ...] = ()
-    size: str | None = None
+    quality: str | None = None
+    background: str | None = None
     output_format: str | None = None
     response_format: str | None = None
     count: int | None = None
-    tools: tuple[ToolSpec, ...] = ()
+    watermark: bool = True
     stream_options: StreamOptions | None = None
     provider_options: dict[str, Any] = field(default_factory=dict)
 
@@ -77,11 +77,12 @@ class ImageGenerationRequest:
         prompt: str,
         *,
         input_items: Iterable[Item] = (),
-        size: str | None = None,
+        quality: str | None = None,
+        background: str | None = None,
         output_format: str | None = None,
         response_format: str | None = None,
         count: int | None = None,
-        tools: Iterable[ToolSpec] = (),
+        watermark: bool = True,
         stream_options: StreamOptions | None = None,
         provider_options: dict[str, Any] | None = None,
     ) -> None:
@@ -92,11 +93,12 @@ class ImageGenerationRequest:
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "prompt", prompt)
         object.__setattr__(self, "input_items", tuple(input_items))
-        object.__setattr__(self, "size", size)
+        object.__setattr__(self, "quality", quality)
+        object.__setattr__(self, "background", background)
         object.__setattr__(self, "output_format", output_format)
         object.__setattr__(self, "response_format", response_format)
         object.__setattr__(self, "count", count)
-        object.__setattr__(self, "tools", tuple(tools))
+        object.__setattr__(self, "watermark", watermark)
         object.__setattr__(self, "stream_options", stream_options)
         object.__setattr__(self, "provider_options", dict(provider_options or {}))
 
@@ -111,6 +113,51 @@ class ImageGenerationResponse:
     usage: Usage | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     raw: Any | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VideoGenerationRequest:
+    """Video generation request model."""
+
+    model: str
+    prompt: str
+    input_items: tuple[Item, ...] = ()
+    duration_seconds: float | None = None
+    ratio: str | None = None
+    resolution: str | None = None
+    generate_audio: bool | None = None
+    watermark: bool = True
+    stream_options: StreamOptions | None = None
+    provider_options: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        input_items: Iterable[Item] = (),
+        duration_seconds: float | None = None,
+        ratio: str | None = None,
+        resolution: str | None = None,
+        generate_audio: bool | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> None:
+        if not model:
+            raise ValueError("VideoGenerationRequest.model is required.")
+        if not prompt:
+            raise ValueError("VideoGenerationRequest.prompt is required.")
+        object.__setattr__(self, "model", model)
+        object.__setattr__(self, "prompt", prompt)
+        object.__setattr__(self, "input_items", tuple(input_items))
+        object.__setattr__(self, "duration_seconds", duration_seconds)
+        object.__setattr__(self, "ratio", ratio)
+        object.__setattr__(self, "resolution", resolution)
+        object.__setattr__(self, "generate_audio", generate_audio)
+        object.__setattr__(self, "watermark", watermark)
+        object.__setattr__(self, "stream_options", stream_options)
+        object.__setattr__(self, "provider_options", dict(provider_options or {}))
 
 
 @dataclass(frozen=True, slots=True)

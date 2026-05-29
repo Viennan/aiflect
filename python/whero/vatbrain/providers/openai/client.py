@@ -24,11 +24,21 @@ from whero.vatbrain.core.generation import (
     ToolCallConfig,
 )
 from whero.vatbrain.core.items import Item
+from whero.vatbrain.core.media import (
+    ImageGenerationRequest,
+    ImageGenerationResponse,
+    ImageGenerationStreamEvent,
+)
 from whero.vatbrain.core.tools import ToolSpec
 from whero.vatbrain.structured import ParsedGenerationResponse, pydantic_output
 from whero.vatbrain.providers.openai.capabilities import (
     get_adapter_capability,
     get_model_capability,
+)
+from whero.vatbrain.providers.openai.media import (
+    from_openai_image_response,
+    from_openai_image_stream_event,
+    to_openai_image_params,
 )
 from whero.vatbrain.providers.openai.mapper import (
     PROVIDER,
@@ -262,6 +272,146 @@ class OpenAIClient:
             yield from_openai_stream_event(event, sequence=sequence)
             sequence += 1
 
+    def generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ImageGenerationResponse:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = self._create_image_response(
+            request,
+            message="OpenAI image generation request failed.",
+        )
+        return from_openai_image_response(response)
+
+    async def agenerate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ImageGenerationResponse:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        response = await self._acreate_image_response(
+            request,
+            message="OpenAI async image generation request failed.",
+        )
+        return from_openai_image_response(response)
+
+    def stream_generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> Iterator[ImageGenerationStreamEvent]:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        stream = self._create_image_stream(
+            request,
+            message="OpenAI stream image generation request failed.",
+        )
+        for sequence, event in enumerate(stream):
+            yield from_openai_image_stream_event(event, sequence=sequence)
+
+    async def astream_generate_image(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        input_items: list[Item] | tuple[Item, ...] = (),
+        quality: str | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        response_format: str | None = None,
+        count: int | None = None,
+        watermark: bool = True,
+        stream_options: StreamOptions | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> AsyncIterator[ImageGenerationStreamEvent]:
+        request = ImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+            input_items=input_items,
+            quality=quality,
+            background=background,
+            output_format=output_format,
+            response_format=response_format,
+            count=count,
+            watermark=watermark,
+            stream_options=stream_options,
+            provider_options=provider_options,
+        )
+        stream = await self._acreate_image_stream(
+            request,
+            message="OpenAI async stream image generation request failed.",
+        )
+        sequence = 0
+        async for event in stream:
+            yield from_openai_image_stream_event(event, sequence=sequence)
+            sequence += 1
+
     def embed(
         self,
         *,
@@ -374,6 +524,34 @@ class OpenAIClient:
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
 
+    def _create_image_response(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        operation, params = to_openai_image_params(request)
+        try:
+            return _call_openai_image_operation(self._sync_client, operation, params)
+        except Exception as exc:
+            raise _provider_request_error(message, operation, exc) from exc
+
+    async def _acreate_image_response(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        operation, params = to_openai_image_params(request)
+        try:
+            return await _acall_openai_image_operation(self._async_openai_client, operation, params)
+        except Exception as exc:
+            raise _provider_request_error(message, operation, exc) from exc
+
+    def _create_image_stream(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        operation, params = to_openai_image_params(request, stream=True)
+        try:
+            return _call_openai_image_operation(self._sync_client, operation, params)
+        except Exception as exc:
+            raise _provider_request_error(message, operation, exc) from exc
+
+    async def _acreate_image_stream(self, request: ImageGenerationRequest, *, message: str) -> Any:
+        operation, params = to_openai_image_params(request, stream=True)
+        try:
+            return await _acall_openai_image_operation(self._async_openai_client, operation, params)
+        except Exception as exc:
+            raise _provider_request_error(message, operation, exc) from exc
+
     @property
     def _sync_client(self) -> Any:
         if self._client is None:
@@ -434,6 +612,22 @@ def _provider_request_error(message: str, operation: str, exc: BaseException) ->
         raw=body,
         cause=exc,
     )
+
+
+def _call_openai_image_operation(client: Any, operation: str, params: Mapping[str, Any]) -> Any:
+    if operation == "images.generate":
+        return client.images.generate(**params)
+    if operation == "images.edit":
+        return client.images.edit(**params)
+    raise ValueError(f"Unsupported OpenAI image operation: {operation}")
+
+
+async def _acall_openai_image_operation(client: Any, operation: str, params: Mapping[str, Any]) -> Any:
+    if operation == "images.generate":
+        return await client.images.generate(**params)
+    if operation == "images.edit":
+        return await client.images.edit(**params)
+    raise ValueError(f"Unsupported OpenAI image operation: {operation}")
 
 
 def _should_replay_without_remote_context(request: GenerationRequest, exc: BaseException) -> bool:

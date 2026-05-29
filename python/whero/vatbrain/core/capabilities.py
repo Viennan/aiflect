@@ -117,6 +117,8 @@ class MediaGenerationCapability:
     streaming: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     async_task: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     output_formats: CapabilityValue[tuple[str, ...]] = field(default_factory=CapabilityValue.unknown)
+    image_background_control: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
+    image_background_values: CapabilityValue[tuple[str, ...]] = field(default_factory=CapabilityValue.unknown)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

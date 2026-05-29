@@ -1,14 +1,14 @@
 # Volcengine Provider 快速开始
 
-状态：v0.4
+状态：v0.5
 日期：2026-05-28
-最近更新：2026-05-28
+最近更新：2026-05-29
 
 ## 定位
 
 本文说明 Python 版 `vatbrain` 的 Volcengine / 火山方舟 provider 用法。完整 API 字段见 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)，实现边界见 [impls/python/volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)。
 
-v0.4 只使用火山方舟 Ark SDK 原生接口：`Ark` / `AsyncArk`、Responses API、Files API 和 multimodal embeddings。它不使用火山方舟 OpenAI-compatible surface，也不把 OpenAI SDK 配置为火山方舟 base URL。
+Volcengine adapter 只使用火山方舟 Ark SDK 原生接口：`Ark` / `AsyncArk`、Responses API、Files API、multimodal embeddings、Images API 和 Content Generation tasks。它不使用火山方舟 OpenAI-compatible surface，也不把 OpenAI SDK 配置为火山方舟 base URL。
 
 ## 安装与环境
 
@@ -75,6 +75,91 @@ for event in client.stream_generate(
 
 Volcengine streaming 会映射 text、function call arguments、reasoning summary、completed/incomplete/failed/error 等事件，并在 `raw_event` 保留 Ark SDK 原始事件。
 
+## 图片生成
+
+图片生成使用 Ark SDK 原生 `images.generate`。纯文本生成和参考图生成都使用同一个 `generate_image()` 入口：
+
+```python
+from whero.vatbrain import ImagePart, MessageItem
+
+response = client.generate_image(
+    model="doubao-seedream-5-0-260128",
+    prompt="A clean product photo on a walnut desk.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(url="https://example.test/reference.png"),
+        ])
+    ],
+    output_format="png",
+    response_format="url",
+    watermark=False,
+)
+
+for artifact in response.artifacts:
+    print(artifact.url or artifact.data)
+```
+
+图片流式生成：
+
+```python
+for event in client.stream_generate_image(
+    model="doubao-seedream-5-0-260128",
+    prompt="A cinematic product photo.",
+    response_format="url",
+):
+    if event.artifact:
+        print(event.type, event.artifact.url or event.artifact.data)
+```
+
+异步入口为 `agenerate_image()` 与 `astream_generate_image()`。
+
+图片生成不提供 normalized `size` 参数。默认由模型从 prompt 中感知分辨率、长宽比和构图规格；如需使用火山方舟原生分辨率控制，应通过 `provider_options` 显式传递对应 Ark 参数。
+
+图片生成请求提供 `watermark` 参数，默认 `True`，并会映射到 Ark `images.generate` 的同名参数。
+
+Volcengine 图片生成当前不支持 normalized `background` 和 `quality`，adapter 会忽略这两个字段。Ark 原生 `size`、`sequential_image_generation`、`sequential_image_generation_options`、`optimize_prompt_options` 等能力可通过 `provider_options` 显式传递；`count` 会映射为 `sequential_image_generation_options.max_images`。
+
+## 视频生成任务
+
+视频生成使用 Ark SDK 原生 `content_generation.tasks.create/get`，以异步任务模型暴露。除 `prompt` 外，`input_items` 还可以携带参考图片、参考视频、参考音频或带 media type 的文件引用：
+
+```python
+from whero.vatbrain import ImagePart, MessageItem, VideoPart
+
+task = client.create_video_generation_task(
+    model="doubao-seedance-2-0-260128",
+    prompt="A short cinematic clip of a product turntable.",
+    input_items=[
+        MessageItem.user([
+            ImagePart(
+                url="https://example.test/first-frame.png",
+                metadata={"role": "first_frame"},
+            ),
+            VideoPart(url="https://example.test/motion-reference.mp4", fps=2.0),
+        ])
+    ],
+    duration_seconds=8,
+    ratio="16:9",
+    generate_audio=True,
+    watermark=False,
+    provider_options={"return_last_frame": True},
+)
+
+task = client.get_video_generation_task(task.id)
+task = client.wait_for_video_generation_task(task.id)
+
+for artifact in task.artifacts:
+    print(artifact.url)
+```
+
+`metadata["role"]` 可用于传递 Ark Content Generation 的 provider-native reference role，例如 `first_frame`、`last_frame`、`reference_image`、`reference_video`。`file_id` 与 `local_path` 不会被隐式上传或读取；需要文件引用时，应使用 URL/base64 data，或先通过 provider 原生流程准备可被任务接口引用的素材 URL。
+
+视频生成请求也提供 `watermark` 参数，默认 `True`，并会映射到 Ark Content Generation task create 的同名参数。
+
+视频任务的 normalized 字段覆盖 `duration_seconds`、`ratio`、`resolution`、`generate_audio` 和 `watermark`。Ark 原生 `seed`、`frames`、`return_last_frame`、`callback_url`、`service_tier`、`execution_expires_after`、`draft`、`priority`、`safety_identifier` 等参数通过 `provider_options` 传递。
+
+`wait_for_video_generation_task()` 会轮询到终态：`completed`、`failed`、`canceled` 或 `expired`；超时会抛 `TimeoutError`。异步入口为 `acreate_video_generation_task()`、`aget_video_generation_task()` 和 `await_video_generation_task()`。
+
 ## Reasoning 与 Structured Output
 
 ```python
@@ -134,7 +219,7 @@ for output in response.output_items:
 followup = client.generate(model="doubao-seed-1-6-...", items=items, tools=tools)
 ```
 
-v0.4 支持 user-executed function tools，不支持通用 custom tools、provider-hosted tools、Remote MCP 的稳定 helper。
+当前 Volcengine adapter 支持 user-executed function tools，不支持通用 custom tools、provider-hosted tools、Remote MCP 的稳定 helper。
 
 ## Files API
 
@@ -175,7 +260,7 @@ response = client.generate(
 ```python
 from whero.vatbrain import EmbeddingInput, ImagePart, TextPart
 
-embedding = client.embed(
+multimodal_embedding = client.embed(
     model="doubao-embedding-vision-...",
     inputs=[
         EmbeddingInput([
@@ -185,15 +270,21 @@ embedding = client.embed(
     ],
     instructions="Target_modality: text.",
     dimensions=1024,
+)
+
+text_embedding = client.embed(
+    model="doubao-embedding-vision-...",
+    inputs=["blue sky"],
+    instructions="Target_modality: text.",
     sparse_embedding=True,
 )
 
-vector = embedding.vectors[0]
+vector = text_embedding.vectors[0]
 print(vector.dense)
 print(vector.sparse)
 ```
 
-v0.4 的 Volcengine embedding 每次只提交一个 `EmbeddingInput`，该输入内部可以混合 text/image/video parts。Ark 多模态 embedding 一次返回一个向量；如需处理多个样本，请在用户代码中循环调用。
+Volcengine embedding 每次只提交一个 `EmbeddingInput`，该输入内部可以混合 text/image/video parts。Ark 多模态 embedding 一次返回一个向量；如需处理多个样本，请在用户代码中循环调用。`sparse_embedding` 是 Ark 原生稀疏向量开关，仅支持纯文本输入；混合图片或视频时不要开启。
 
 ## Remote Context 与 Replay
 
@@ -227,7 +318,9 @@ second = client.generate(
 
 ## 当前限制
 
-- Generation 只使用 Ark SDK Responses API，不提供 Chat API fallback。
+- 文本 generation 只使用 Ark SDK Responses API，不提供 Chat API fallback。
+- 图片生成只使用 Ark SDK Images API。
+- 视频生成只使用 Ark SDK Content Generation tasks。
 - 不使用 OpenAI-compatible SDK surface。
 - 不自动上传本地文件。
 - 不自动执行工具。
