@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -14,6 +16,7 @@ from whero.vatbrain import (
     RemoteContextHint,
     RemoteContextInvalidBehavior,
     ReplayPolicy,
+    SecretString,
     TaskStatus,
     VideoPart,
 )
@@ -693,9 +696,7 @@ def test_client_file_methods_use_ark_files_endpoint() -> None:
     assert fake.files.wait_calls[0][1] == {"poll_interval": 0.1, "max_wait_seconds": 1}
 
 
-def test_client_common_init_options_are_collected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENV_VATBRAIN_VOLCENGINE_API_KEY", "env-key")
-
+def test_client_common_init_options_are_collected() -> None:
     client = VolcengineClient(
         config=ClientConfig(
             api_key="from-config",
@@ -705,25 +706,56 @@ def test_client_common_init_options_are_collected(monkeypatch: pytest.MonkeyPatc
             provider_options={"region": "cn-beijing"},
         ),
         timeout=10.0,
-        ak="ak",
+        region="cn-shanghai",
     )
 
     assert client._client_options == {
-        "api_key": "from-config",
+        "api_key": SecretString("from-config"),
         "base_url": "https://example.test/api/v3",
         "timeout": 10.0,
         "max_retries": 1,
-        "region": "cn-beijing",
-        "ak": "ak",
+        "region": "cn-shanghai",
     }
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
 
 
-def test_client_reads_provider_scoped_vatbrain_env_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_client_does_not_read_provider_scoped_vatbrain_env_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENV_VATBRAIN_VOLCENGINE_API_KEY", "env-key")
 
-    client = VolcengineClient()
+    with pytest.raises(ValueError, match="requires api_key"):
+        VolcengineClient()
 
-    assert client._client_options["api_key"] == "env-key"
+
+def test_client_reveals_secret_string_only_when_creating_sdk_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ark_cls = Mock(return_value=object())
+    async_ark_cls = Mock(return_value=object())
+    monkeypatch.setitem(
+        sys.modules,
+        "volcenginesdkarkruntime",
+        SimpleNamespace(Ark=ark_cls, AsyncArk=async_ark_cls),
+    )
+    client = VolcengineClient(
+        api_key=SecretString("explicit"),
+        region="cn-beijing",
+    )
+
+    assert client._client_options["api_key"] == SecretString("explicit")
+
+    _ = client._sync_client
+    _ = client._async_ark_client
+
+    ark_cls.assert_called_once_with(api_key="explicit", region="cn-beijing")
+    async_ark_cls.assert_called_once_with(api_key="explicit", region="cn-beijing")
+
+
+def test_client_config_api_key_satisfies_explicit_credential_requirement() -> None:
+    client = VolcengineClient(config=ClientConfig(api_key="from-config"))
+
+    assert client._client_options["api_key"] == SecretString("from-config")
 
 
 def test_client_request_error_is_wrapped_with_provider_details() -> None:

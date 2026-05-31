@@ -83,7 +83,7 @@ provider id: volcengine
 api family: responses
 snapshot key: volcengine.responses
 client: VolcengineClient
-api key env: ENV_VATBRAIN_VOLCENGINE_API_KEY
+credential handling: explicit LLM `api_key` / `ClientConfig.api_key` only; stored as `SecretString` internally
 default base URL: https://ark.cn-beijing.volces.com/api/v3
 ```
 
@@ -143,7 +143,7 @@ v0.4 不新增 OpenAI-compatible SDK 依赖，也不新增 direct HTTP 专用依
 ```python
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
-client = VolcengineClient()
+client = VolcengineClient(api_key="...")
 
 response = client.generate(model="...", items=[...])
 stream = client.stream_generate(model="...", items=[...])
@@ -166,7 +166,7 @@ file = await client.aupload_file(file=..., purpose="user_data")
 ```python
 VolcengineClient(
     config=None,
-    api_key=None,
+    api_key="...",
     base_url=None,
     timeout=None,
     max_retries=None,
@@ -179,10 +179,10 @@ VolcengineClient(
 
 解析规则：
 
-- `api_key` 优先级：显式参数 > `ClientConfig.api_key` > `ENV_VATBRAIN_VOLCENGINE_API_KEY`。
+- `api_key` 优先级：显式参数 > `ClientConfig.api_key`；不再读取环境变量作为隐式 fallback。
 - `base_url` 优先级：显式参数 > `ClientConfig.base_url` > 默认 base URL。
-- `timeout`、`max_retries` 与 `provider_client_options` 透传给 Ark SDK backend。
-- 不读取 `ARK_API_KEY` 作为 public contract；需要兼容时可通过 `provider_client_options` 或用户自行传入。
+- `timeout`、`max_retries` 与 `provider_client_options` 透传给 Ark SDK backend；LLM 凭据统一使用 `api_key` / `ClientConfig.api_key`，在 adapter 内部以 `SecretString` 保存，创建 Ark SDK client 时才解包。
+- 不读取 `ARK_API_KEY` 或 `ENV_VATBRAIN_VOLCENGINE_API_KEY` 作为 public contract；需要兼容时由用户代码显式读取后传入。
 
 ## Generation 映射
 

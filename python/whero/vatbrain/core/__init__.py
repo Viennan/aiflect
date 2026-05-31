@@ -12,7 +12,13 @@ from whero.vatbrain.core.capabilities import (
     ResourceCapability,
     ToolCapability,
 )
-from whero.vatbrain.core.client import ClientConfig
+from whero.vatbrain.core.client import (
+    ClientConfig,
+    SecretString,
+    reveal_secret_values,
+    secretize_client_options,
+    to_secret_string,
+)
 from whero.vatbrain.core.embeddings import (
     EmbeddingInput,
     EmbeddingRequest,
@@ -130,6 +136,7 @@ __all__ = [
     "ResourceCapability",
     "ResponseFormat",
     "Role",
+    "SecretString",
     "SparseEmbedding",
     "StreamOptions",
     "TaskStatus",
@@ -144,4 +151,7 @@ __all__ = [
     "VideoPart",
     "provider_snapshot_for",
     "provider_snapshot_key",
+    "reveal_secret_values",
+    "secretize_client_options",
+    "to_secret_string",
 ]

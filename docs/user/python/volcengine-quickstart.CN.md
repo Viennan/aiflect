@@ -2,7 +2,7 @@
 
 状态：v0.5
 日期：2026-05-28
-最近更新：2026-05-29
+最近更新：2026-05-31
 
 ## 定位
 
@@ -15,7 +15,6 @@ Volcengine adapter 只使用火山方舟 Ark SDK 原生接口：`Ark` / `AsyncAr
 ```bash
 cd python
 .venv/bin/python -m pip install -e ".[volcengine,test]"
-export ENV_VATBRAIN_VOLCENGINE_API_KEY="..."
 ```
 
 初始化 client：
@@ -23,10 +22,10 @@ export ENV_VATBRAIN_VOLCENGINE_API_KEY="..."
 ```python
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
-client = VolcengineClient()
+client = VolcengineClient(api_key="...")
 ```
 
-也可以显式传入 Ark SDK client 参数：
+也可以显式传入 Ark SDK client 的非凭据参数；LLM 凭据统一使用 `api_key`：
 
 ```python
 client = VolcengineClient(
@@ -43,7 +42,7 @@ client = VolcengineClient(
 from whero.vatbrain import ImagePart, MessageItem, TextPart
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
-client = VolcengineClient()
+client = VolcengineClient(api_key="...")
 
 response = client.generate(
     model="doubao-seed-1-6-...",

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from pydantic import BaseModel
@@ -13,6 +15,7 @@ from whero.vatbrain import (
     RemoteContextHint,
     RemoteContextInvalidBehavior,
     ReplayPolicy,
+    SecretString,
     ToolCallConfig,
 )
 from whero.vatbrain.core.errors import ProviderRequestError, UnsupportedCapabilityError
@@ -611,21 +614,48 @@ def test_client_common_init_options_are_collected() -> None:
     )
 
     assert client._client_options == {
-        "api_key": "explicit",
+        "api_key": SecretString("explicit"),
         "base_url": "https://example.test/v1",
         "timeout": 10.0,
         "max_retries": 1,
         "default_headers": {"x-config": "yes"},
         "organization": "org_1",
     }
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
 
 
-def test_client_reads_provider_scoped_vatbrain_env_api_key(monkeypatch) -> None:
+def test_client_does_not_read_provider_scoped_vatbrain_env_api_key(monkeypatch) -> None:
     monkeypatch.setenv("ENV_VATBRAIN_OPENAI_API_KEY", "env-key")
 
-    client = OpenAIClient()
+    with pytest.raises(ValueError, match="requires api_key"):
+        OpenAIClient()
 
-    assert client._client_options["api_key"] == "env-key"
+
+def test_client_reveals_secret_string_only_when_creating_sdk_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    openai_cls = Mock(return_value=object())
+    async_openai_cls = Mock(return_value=object())
+    monkeypatch.setitem(
+        sys.modules,
+        "openai",
+        SimpleNamespace(OpenAI=openai_cls, AsyncOpenAI=async_openai_cls),
+    )
+    client = OpenAIClient(api_key=SecretString("explicit"), organization="org_1")
+
+    assert client._client_options["api_key"] == SecretString("explicit")
+
+    _ = client._sync_client
+    _ = client._async_openai_client
+
+    openai_cls.assert_called_once_with(api_key="explicit", organization="org_1")
+    async_openai_cls.assert_called_once_with(api_key="explicit", organization="org_1")
+
+
+def test_client_config_api_key_satisfies_explicit_credential_requirement() -> None:
+    client = OpenAIClient(config=ClientConfig(api_key="from-config"))
+
+    assert client._client_options["api_key"] == SecretString("from-config")
 
 
 def test_client_request_error_is_wrapped_with_provider_details() -> None:

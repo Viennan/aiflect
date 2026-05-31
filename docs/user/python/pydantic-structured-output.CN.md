@@ -38,7 +38,7 @@ class Contact(BaseModel):
     email: str
 
 
-client = OpenAIClient()
+client = OpenAIClient(api_key="...")
 contact_output = pydantic_output(Contact, name="contact")
 
 response = client.generate(

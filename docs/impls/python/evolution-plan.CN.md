@@ -307,10 +307,10 @@ v0.4 方案基于以下知识库资料：
 
 - provider id：`volcengine`
 - client：`VolcengineClient`
-- API key 环境变量：`ENV_VATBRAIN_VOLCENGINE_API_KEY`
+- API key 初始化：用户必须显式传入 LLM `api_key` / `ClientConfig.api_key`；adapter 不读取环境变量作为隐式 fallback。
 - 默认 base URL：`https://ark.cn-beijing.volces.com/api/v3`
 - provider-native snapshot key：`volcengine.responses`
-- 底层使用 Ark SDK 的 api key 初始化语义，但 `vatbrain` public API 只承诺读取 `ENV_VATBRAIN_VOLCENGINE_API_KEY`。
+- 底层使用 Ark SDK 的 LLM api key 初始化语义，adapter 内部以 `SecretString` 保存 API key。
 
 #### 调用面原则
 

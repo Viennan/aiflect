@@ -2,7 +2,7 @@
 
 状态：v0.5
 日期：2026-05-05
-最近更新：2026-05-29
+最近更新：2026-05-31
 
 ## 读者路径
 
@@ -21,17 +21,10 @@ python3 -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-OpenAI adapter 使用 `ENV_VATBRAIN_OPENAI_API_KEY`：
-
-```bash
-export ENV_VATBRAIN_OPENAI_API_KEY="..."
-```
-
-Volcengine adapter 使用 optional extra 与 `ENV_VATBRAIN_VOLCENGINE_API_KEY`：
+OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfig(api_key=...)` 提供。Volcengine adapter 使用 optional extra，初始化时同样必须显式传入 LLM API key，即 `api_key` / `ClientConfig.api_key`。
 
 ```bash
 .venv/bin/python -m pip install -e ".[volcengine,test]"
-export ENV_VATBRAIN_VOLCENGINE_API_KEY="..."
 ```
 
 初始化 client：
@@ -40,8 +33,8 @@ export ENV_VATBRAIN_VOLCENGINE_API_KEY="..."
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
-openai_client = OpenAIClient()
-volcengine_client = VolcengineClient()
+openai_client = OpenAIClient(api_key="...")
+volcengine_client = VolcengineClient(api_key="...")
 ```
 
 也可以显式传入 provider client 参数：
@@ -63,7 +56,7 @@ client = OpenAIClient(
 from whero.vatbrain import MessageItem
 from whero.vatbrain.providers.openai import OpenAIClient
 
-client = OpenAIClient()
+client = OpenAIClient(api_key="...")
 
 response = client.generate(
     model="gpt-5.1",

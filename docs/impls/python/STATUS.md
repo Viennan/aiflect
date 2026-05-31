@@ -2,7 +2,7 @@
 
 状态：v0.5 已完成
 日期：2026-05-05
-最近更新：2026-05-29
+最近更新：2026-05-31
 
 ## 当前基线
 
@@ -26,7 +26,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 
 - Python 包脚手架与 `pyproject.toml`。
 - 通用 client 初始化配置：`ClientConfig`。
-- OpenAI API key 环境变量：`ENV_VATBRAIN_OPENAI_API_KEY`。
+- `SecretString`：provider adapter 用于存储 LLM API key。
+- OpenAI / Volcengine adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
 - 默认单元测试不依赖真实 provider API。
 
 ### Core
@@ -123,7 +124,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 - Provider package：`whero.vatbrain.providers.volcengine`。
 - Optional dependency：`whero-vatbrain[volcengine]`，使用 `volcengine-python-sdk[ark]>=5.0.30,<6`。
 - Client：`VolcengineClient`。
-- API key 环境变量：`ENV_VATBRAIN_VOLCENGINE_API_KEY`。
+- LLM API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
 - 严格使用 Ark SDK 原生 surface：
   - `Ark` / `AsyncArk`。
   - `responses.create`。
@@ -217,4 +218,4 @@ cd python
 ./.venv/bin/python -m pytest
 ```
 
-当前 v0.5 基线：`161 passed`。
+当前 v0.5 基线：`168 passed`。

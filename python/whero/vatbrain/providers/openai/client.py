@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator, Mapping
-import os
 from typing import Any
 
 from whero.vatbrain.core.capabilities import AdapterCapability, ModelCapability
-from whero.vatbrain.core.client import ClientConfig
+from whero.vatbrain.core.client import (
+    ClientConfig,
+    SecretString,
+    reveal_secret_values,
+    secretize_client_options,
+    to_secret_string,
+)
 from whero.vatbrain.core.embeddings import EmbeddingInput, EmbeddingRequest, EmbeddingResponse
 from whero.vatbrain.core.errors import ProviderRequestError
 from whero.vatbrain.core.generation import (
@@ -54,13 +59,12 @@ class OpenAIClient:
     """Provider-level OpenAI adapter client."""
 
     provider = "openai"
-    api_key_env_var = "ENV_VATBRAIN_OPENAI_API_KEY"
 
     def __init__(
         self,
         *,
         config: ClientConfig | None = None,
-        api_key: str | None = None,
+        api_key: str | SecretString | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
         max_retries: int | None = None,
@@ -78,6 +82,11 @@ class OpenAIClient:
             timeout=timeout,
             max_retries=max_retries,
             provider_options=openai_client_options,
+        )
+        _validate_client_credentials(
+            client=client,
+            async_client=async_client,
+            options=self._client_options,
         )
         self._model_capability_overrides = {
             model: dict(values)
@@ -557,7 +566,7 @@ class OpenAIClient:
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(**self._client_options)
+            self._client = OpenAI(**reveal_secret_values(self._client_options))
         return self._client
 
     @property
@@ -565,29 +574,27 @@ class OpenAIClient:
         if self._async_client is None:
             from openai import AsyncOpenAI
 
-            self._async_client = AsyncOpenAI(**self._client_options)
+            self._async_client = AsyncOpenAI(**reveal_secret_values(self._client_options))
         return self._async_client
 
 
 def _merge_client_options(
     *,
     config: ClientConfig | None,
-    api_key: str | None,
+    api_key: str | SecretString | None,
     base_url: str | None,
     timeout: float | None,
     max_retries: int | None,
     provider_options: Mapping[str, Any],
 ) -> dict[str, Any]:
-    options: dict[str, Any] = dict(config.provider_options or {}) if config else {}
-    options.update(provider_options)
+    options: dict[str, Any] = secretize_client_options(config.provider_options or {}) if config else {}
+    options.update(secretize_client_options(provider_options))
     resolved_api_key = api_key if api_key is not None else (config.api_key if config else None)
-    if resolved_api_key is None:
-        resolved_api_key = os.getenv(OpenAIClient.api_key_env_var)
     resolved_base_url = base_url if base_url is not None else (config.base_url if config else None)
     resolved_timeout = timeout if timeout is not None else (config.timeout if config else None)
     resolved_max_retries = max_retries if max_retries is not None else (config.max_retries if config else None)
     if resolved_api_key is not None:
-        options["api_key"] = resolved_api_key
+        options["api_key"] = to_secret_string(resolved_api_key)
     if resolved_base_url is not None:
         options["base_url"] = resolved_base_url
     if resolved_timeout is not None:
@@ -595,6 +602,22 @@ def _merge_client_options(
     if resolved_max_retries is not None:
         options["max_retries"] = resolved_max_retries
     return options
+
+
+def _validate_client_credentials(
+    *,
+    client: Any | None,
+    async_client: Any | None,
+    options: Mapping[str, Any],
+) -> None:
+    if client is not None and async_client is not None:
+        return
+    if options.get("api_key") is not None:
+        return
+    raise ValueError(
+        "OpenAIClient requires api_key or ClientConfig.api_key at initialization "
+        "when provider SDK clients are not injected."
+    )
 
 
 def _provider_request_error(message: str, operation: str, exc: BaseException) -> ProviderRequestError:

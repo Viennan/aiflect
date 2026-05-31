@@ -2,7 +2,7 @@
 
 状态：v0.5
 日期：2026-05-13
-最近更新：2026-05-29
+最近更新：2026-05-31
 
 ## 定位
 
@@ -56,7 +56,7 @@ config = ClientConfig(
 
 字段：
 
-- `api_key`：provider API key。
+- `api_key`：provider API key。`ClientConfig` 会将该字段包装为 `SecretString`，避免在 repr 中裸露。
 - `base_url`：provider base URL。
 - `timeout`：provider SDK 超时配置。
 - `max_retries`：provider SDK 重试配置。
@@ -69,10 +69,10 @@ config = ClientConfig(
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
 
-client = OpenAIClient()
+client = OpenAIClient(api_key="...")
 ```
 
-OpenAI API key 可通过 `ENV_VATBRAIN_OPENAI_API_KEY` 提供，也可在初始化时传入：
+OpenAI API key 必须在初始化时显式传入，或通过 `ClientConfig(api_key=...)` 提供：
 
 ```python
 client = OpenAIClient(api_key="...", base_url="...", timeout=30.0)
@@ -85,7 +85,7 @@ client = OpenAIClient(api_key="...", base_url="...", timeout=30.0)
 - `client`：注入已有同步 OpenAI SDK client，常用于测试或复用连接。
 - `async_client`：注入已有异步 OpenAI SDK client。
 - `model_capability_overrides`：用户侧模型能力覆写。
-- `**openai_client_options`：透传给 OpenAI SDK client 的初始化参数。
+- `**openai_client_options`：透传给 OpenAI SDK client 的初始化参数；其中已知 secret 字段会以 `SecretString` 保存。
 
 OpenAI client 方法：
 
@@ -111,10 +111,10 @@ Volcengine provider 使用火山方舟 Ark SDK 原生接口，不使用 OpenAI-c
 ```python
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
-client = VolcengineClient()
+client = VolcengineClient(api_key="...")
 ```
 
-Volcengine API key 可通过 `ENV_VATBRAIN_VOLCENGINE_API_KEY` 提供，也可在初始化时传入：
+Volcengine LLM API key 必须在初始化时显式传入，或通过 `ClientConfig(api_key=...)` 提供：
 
 ```python
 client = VolcengineClient(api_key="...", base_url="...", timeout=30.0)
@@ -134,7 +134,7 @@ cd python
 - `client`：注入已有同步 Ark SDK client，常用于测试或复用连接。
 - `async_client`：注入已有异步 Ark SDK client。
 - `model_capability_overrides`：用户侧模型能力覆写。
-- `**ark_client_options`：透传给 Ark SDK client 的初始化参数，例如 `ak`、`sk`、`region` 等。
+- `**ark_client_options`：透传给 Ark SDK client 的非凭据初始化参数，例如 `region` 等。LLM 凭据统一使用 `api_key` / `ClientConfig.api_key`。
 
 Volcengine client 方法：
 

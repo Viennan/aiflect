@@ -2,7 +2,7 @@
 
 状态：v0.5 已系统化整理
 日期：2026-05-05
-最近更新：2026-05-29
+最近更新：2026-05-31
 
 ## 当前文档
 
@@ -15,7 +15,7 @@
 
 - OpenAI provider client：
   - 初始化。
-  - 环境变量。
+  - 显式凭据初始化与 SecretString 存储。
   - 同步/异步 generation。
   - 同步/异步 streaming。
   - 同步/异步 embedding。
@@ -23,7 +23,7 @@
   - capability 查询。
 - Volcengine provider client：
   - `whero-vatbrain[volcengine]` optional dependency。
-  - `ENV_VATBRAIN_VOLCENGINE_API_KEY`。
+  - 显式凭据初始化与 SecretString 存储。
   - Ark SDK-only 调用边界。
   - 同步/异步 generation 与 streaming。
   - Responses API text/image/video/file input。
