@@ -2,8 +2,10 @@
 .idea
 build
 tmp
+.tmp
 __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
-python/.venv/
+/.venv/
+.creds.json

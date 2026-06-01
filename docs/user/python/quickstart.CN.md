@@ -15,16 +15,16 @@
 仓库开发环境：
 
 ```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e "python[test]"
 cd python
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[test]"
-.venv/bin/python -m pytest
+../.venv/bin/python -m pytest
 ```
 
 OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfig(api_key=...)` 提供。Volcengine adapter 使用 optional extra，初始化时同样必须显式传入 LLM API key，即 `api_key` / `ClientConfig.api_key`。
 
 ```bash
-.venv/bin/python -m pip install -e ".[volcengine,test]"
+.venv/bin/python -m pip install -e "python[volcengine,test]"
 ```
 
 初始化 client：

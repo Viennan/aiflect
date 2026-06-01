@@ -121,7 +121,7 @@ python/tests/unit/test_openai_*.py
 
 #### 验证
 
-- `python/.venv/bin/python -m pytest`
+- `.venv/bin/python -m pytest`
 - 新增 OpenAI Responses create params fixture tests。
 - 新增 OpenAI stream event fixture tests。
 
@@ -483,7 +483,7 @@ python/tests/unit/test_volcengine_embeddings.py
 7. 补充 provider-native snapshot、`ReplayPolicy` 与 remote context fallback 测试。
 8. 更新用户文档和 STATUS，新增 `docs/user/python/volcengine-quickstart.CN.md`。
 
-每一步应保持默认 `python/.venv/bin/python -m pytest` 可通过。AI 协助下，mapper 与 fixture test 可以小步并行推进；真正需要人工核验的是 Ark SDK 合约和真实 API 差异。
+每一步应保持默认 `.venv/bin/python -m pytest` 可通过。AI 协助下，mapper 与 fixture test 可以小步并行推进；真正需要人工核验的是 Ark SDK 合约和真实 API 差异。
 
 #### 验收标准
 
@@ -519,7 +519,7 @@ python/tests/unit/test_volcengine_embeddings.py
 
 ```bash
 cd python
-.venv/bin/python -m pytest
+../.venv/bin/python -m pytest
 ```
 
 v0.4 完成时结果：`123 passed`。
@@ -609,7 +609,7 @@ Volcengine adapter 已完成：
 
 ```bash
 cd python
-.venv/bin/python -m pytest
+../.venv/bin/python -m pytest
 ```
 
 当前结果：`147 passed`。

@@ -272,7 +272,7 @@ docs/INDEX.md
 
 ```bash
 cd python
-.venv/bin/python -m pytest
+../.venv/bin/python -m pytest
 ```
 
 ## 风险与决策点

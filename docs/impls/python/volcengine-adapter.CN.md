@@ -764,7 +764,7 @@ v0.4 已同步更新：
 
 ## 验收标准
 
-- 默认测试通过：`cd python && ./.venv/bin/python -m pytest`。
+- 默认测试通过：`cd python && ../.venv/bin/python -m pytest`。
 - Volcengine adapter 不引入 Chat Completions generation 路径。
 - Core/OpenAI adapter 不依赖 Volcengine optional dependency。
 - 所有 public 行为有用户文档入口。

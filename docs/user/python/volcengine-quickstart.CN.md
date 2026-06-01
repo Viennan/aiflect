@@ -14,7 +14,7 @@ Volcengine adapter 只使用火山方舟 Ark SDK 原生接口：`Ark` / `AsyncAr
 
 ```bash
 cd python
-.venv/bin/python -m pip install -e ".[volcengine,test]"
+../.venv/bin/python -m pip install -e ".[volcengine,test]"
 ```
 
 初始化 client：

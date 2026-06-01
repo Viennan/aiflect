@@ -89,7 +89,7 @@ python/
 - test dependency：`pytest`。
 - 可选 lint/type dependency 可后续引入。
 
-所有开发与测试命令应使用 `python/.venv`。
+所有开发与测试命令应使用项目根目录 `.venv`。
 
 ## Core 模型
 

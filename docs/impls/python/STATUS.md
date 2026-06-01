@@ -200,7 +200,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 
 ## 注意事项
 
-- 所有 Python 命令必须使用 `python/.venv`。
+- 所有 Python 命令必须使用项目根目录 `.venv`。
 - Capability 中无法可靠获取的 model 字段应表达为 unknown。
 - Reasoning 与 parallel tool calls 是通用 generation 配置，不应作为 OpenAI 专有参数处理。
 - 不同 provider 的 reasoning effort 取值不同，应通过 capability 字段声明支持集合。
@@ -215,7 +215,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 
 ```bash
 cd python
-./.venv/bin/python -m pytest
+../.venv/bin/python -m pytest
 ```
 
 当前 v0.5 基线：`168 passed`。

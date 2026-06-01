@@ -124,7 +124,7 @@ client = VolcengineClient(api_key="...", base_url="...", timeout=30.0)
 
 ```bash
 cd python
-.venv/bin/python -m pip install -e ".[volcengine]"
+../.venv/bin/python -m pip install -e ".[volcengine]"
 ```
 
 初始化参数：

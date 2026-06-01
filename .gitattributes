@@ -1,0 +1,6 @@
+# Keep binary and large test assertion assets in Git LFS by default.
+asserts/** filter=lfs diff=lfs merge=lfs -text
+
+# Assertion indexes and text notes are maintained as normal Git text files.
+asserts/**/*.md -filter -diff -merge text eol=lf
+asserts/INDEX.md -filter -diff -merge text eol=lf

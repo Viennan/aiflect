@@ -20,7 +20,7 @@ pip install "whero-vatbrain[pydantic]"
 
 ```bash
 cd python
-.venv/bin/python -m pip install -e ".[test,pydantic]"
+../.venv/bin/python -m pip install -e ".[test,pydantic]"
 ```
 
 ## 显式 helper 用法
