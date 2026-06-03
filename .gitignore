@@ -8,4 +8,5 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 /.venv/
-.creds.json
+/creds.json
+/.creds.json
