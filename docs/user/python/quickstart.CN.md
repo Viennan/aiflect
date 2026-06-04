@@ -6,7 +6,7 @@
 
 ## 读者路径
 
-本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine adapter 支持范围见 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)。Volcengine provider 细节见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine adapter 支持范围见 [api-reference.CN.md](api-reference.CN.md)。Volcengine provider 细节见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 是 provider-neutral 的推理调用抽象层，不是 agent runtime。它不会自动选择 provider、自动选择 model、自动 fallback、自动执行工具或自动维护远端会话。用户代码始终掌控 provider、model、上下文、工具执行和下一轮调用。
 
@@ -643,8 +643,8 @@ except ProviderRequestError as exc:
 
 ## 参考
 
-- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)
-- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)
-- [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)
-- [design/high-level-design.CN.md](design/high-level-design.CN.md)
-- [impls/python/STATUS.md](impls/python/STATUS.md)
+- [api-reference.CN.md](api-reference.CN.md)
+- [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)
+- [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)
+- [high-level-design.CN.md](../../design/high-level-design.CN.md)
+- [impls/python/STATUS.md](../../impls/python/STATUS.md)

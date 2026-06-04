@@ -258,7 +258,7 @@ MessageItem.assistant_phase: AssistantMessagePhase | str | None
 
 ## 参考资料
 
-- [design/high-level-design.CN.md](design/high-level-design.CN.md)
-- [design/provider-capability-integration.CN.md](design/provider-capability-integration.CN.md)
-- [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md)
+- [high-level-design.CN.md](high-level-design.CN.md)
+- [provider-capability-integration.CN.md](provider-capability-integration.CN.md)
+- [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
 - OpenAI Responses input item 文档：https://platform.openai.com/docs/api-reference/responses/input-items

@@ -6,7 +6,7 @@
 
 ## 定位
 
-本文说明 Python 版 `vatbrain` 的 Volcengine / 火山方舟 provider 用法。完整 API 字段见 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)，实现边界见 [impls/python/volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)。
+本文说明 Python 版 `vatbrain` 的 Volcengine / 火山方舟 provider 用法。完整 API 字段见 [api-reference.CN.md](api-reference.CN.md)，实现边界见 [volcengine-adapter.CN.md](../../impls/python/volcengine-adapter.CN.md)。
 
 Volcengine adapter 只使用火山方舟 Ark SDK 原生接口：`Ark` / `AsyncArk`、Responses API、Files API、multimodal embeddings、Images API 和 Content Generation tasks。它不使用火山方舟 OpenAI-compatible surface，也不把 OpenAI SDK 配置为火山方舟 base URL。
 

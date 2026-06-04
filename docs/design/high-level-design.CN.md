@@ -61,7 +61,7 @@ provider 侧的 stored response、previous response、conversation、context cac
 
 Full-context First 不等于每次 provider 请求都必须传输完整 input。若用户明确说明某个 `previous_response_id` 已覆盖完整 `items` 的前缀，adapter 可以只把未覆盖的追加 suffix 发送给 provider。该覆盖边界必须显式表达，例如通过 `RemoteContextHint.covered_item_count`；adapter 不能只凭 `previous_response_id` 猜测哪些 item 是 history、哪些 item 是新增输入。
 
-当远端上下文 hint 失效时，adapter 不应默认静默 fallback。若用户显式启用重放策略，adapter 可以基于完整 `Item` 序列重新发起请求。为避免丢失 provider 原生 item 字段，`vatbrain` 应支持 provider-native snapshot 与强制 replay 策略；详见 [design/provider-native-replay.CN.md](design/provider-native-replay.CN.md)。
+当远端上下文 hint 失效时，adapter 不应默认静默 fallback。若用户显式启用重放策略，adapter 可以基于完整 `Item` 序列重新发起请求。为避免丢失 provider 原生 item 字段，`vatbrain` 应支持 provider-native snapshot 与强制 replay 策略；详见 [provider-native-replay.CN.md](provider-native-replay.CN.md)。
 
 ### API-family Separation
 
@@ -604,14 +604,14 @@ capability 是能力描述和校验辅助，不是自动决策机制。调用前
 
 ## 参考资料
 
-- [design/provider-capability-integration.CN.md](design/provider-capability-integration.CN.md)
-- [design/provider-native-replay.CN.md](design/provider-native-replay.CN.md)
-- [3rds/volengine/INDEX.md](3rds/volengine/INDEX.md)
-- [3rds/volengine/response_api.md](3rds/volengine/response_api.md)
-- [3rds/volengine/file_api.md](3rds/volengine/file_api.md)
-- [3rds/volengine/embeding.md](3rds/volengine/embeding.md)
-- [3rds/volengine/image_generation.md](3rds/volengine/image_generation.md)
-- [3rds/volengine/video_generation.md](3rds/volengine/video_generation.md)
+- [provider-capability-integration.CN.md](provider-capability-integration.CN.md)
+- [provider-native-replay.CN.md](provider-native-replay.CN.md)
+- [volengine/INDEX.md](../3rds/volengine/INDEX.md)
+- [response_api.md](../3rds/volengine/response_api.md)
+- [file_api.md](../3rds/volengine/file_api.md)
+- [embeding.md](../3rds/volengine/embeding.md)
+- [image_generation.md](../3rds/volengine/image_generation.md)
+- [video_generation.md](../3rds/volengine/video_generation.md)
 - [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses)
 - [OpenAI Responses API migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - [OpenAI streaming responses](https://platform.openai.com/docs/api-reference/streaming)

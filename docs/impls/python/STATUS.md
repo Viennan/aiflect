@@ -4,21 +4,25 @@
 日期：2026-05-05
 最近更新：2026-05-31
 
+## 定位
+
+本文件描述 Python 参考实现的当前能力基线、暂不实现项、后续规划和验证方式。它不维护需求生命周期或需求级进度；相关需求状态见 [requirements/STATUS.md](../../requirements/STATUS.md)。
+
 ## 当前基线
 
 Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media Generation，在 v0.4 Volcengine adapter MVP 基础上接入 OpenAI Images API、Volcengine Ark Images API 与 Volcengine Content Generation 视频任务。
 
 核心文档：
 
-- [design/high-level-design.CN.md](design/high-level-design.CN.md)
-- [design/provider-capability-integration.CN.md](design/provider-capability-integration.CN.md)
-- [design/provider-native-replay.CN.md](design/provider-native-replay.CN.md)
-- [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md)
-- [impls/python/volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)
-- [impls/python/v0.5-media-generation.CN.md](impls/python/v0.5-media-generation.CN.md)
-- [impls/python/v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)
-- [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)
-- [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)
+- [high-level-design.CN.md](../../design/high-level-design.CN.md)
+- [provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md)
+- [provider-native-replay.CN.md](../../design/provider-native-replay.CN.md)
+- [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
+- [volcengine-adapter.CN.md](volcengine-adapter.CN.md)
+- [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
+- [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
+- [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
+- [impls/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)
 
 ## 已实现
 

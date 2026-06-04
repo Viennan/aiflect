@@ -6,10 +6,10 @@
 
 ## 当前文档
 
-- [user/python/quickstart.CN.md](user/python/quickstart.CN.md)：渐进式用户指南，从安装、client 初始化、generation、remote context/replay、streaming、图片/视频生成、structured output、tools、embedding、capability 到错误处理。
-- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)：Python public API 参考，覆盖当前暴露给用户的 core dataclass、enum、provider client、media generation、Pydantic helper、capability、usage 与错误类型。
-- [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，覆盖 Ark SDK-only 安装、generation、streaming、图片生成、视频任务、Files API、多模态 embedding、function tools、remote context 与限制。
-- [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)：Pydantic structured output 编程模型，说明 helper、默认 schema 行为、strict schema、解析与错误处理。
+- [quickstart.CN.md](quickstart.CN.md)：渐进式用户指南，从安装、client 初始化、generation、remote context/replay、streaming、图片/视频生成、structured output、tools、embedding、capability 到错误处理。
+- [api-reference.CN.md](api-reference.CN.md)：Python public API 参考，覆盖当前暴露给用户的 core dataclass、enum、provider client、media generation、Pydantic helper、capability、usage 与错误类型。
+- [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，覆盖 Ark SDK-only 安装、generation、streaming、图片生成、视频任务、Files API、多模态 embedding、function tools、remote context 与限制。
+- [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)：Pydantic structured output 编程模型，说明 helper、默认 schema 行为、strict schema、解析与错误处理。
 
 ## 已覆盖
 
@@ -92,9 +92,9 @@
 
 ## 后续维护规则
 
-- 新增 public API 时，同步更新 [user/python/api-reference.CN.md](user/python/api-reference.CN.md)。
-- 用户常用主流程变化时，同步更新 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)。
-- Structured output helper 变化时，同步更新 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+- 新增 public API 时，同步更新 [api-reference.CN.md](api-reference.CN.md)。
+- 用户常用主流程变化时，同步更新 [quickstart.CN.md](quickstart.CN.md)。
+- Structured output helper 变化时，同步更新 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 - 新增 provider adapter 时，新增 provider-specific quickstart，并在 API reference 中说明支持范围。
 - 若 provider adapter 支持某个 core 模型的真实调用，应把“core-only”边界更新为“provider-supported”。
 

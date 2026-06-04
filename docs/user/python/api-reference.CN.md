@@ -6,7 +6,7 @@
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.5 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [user/python/quickstart.CN.md](user/python/quickstart.CN.md)；Volcengine provider 用法见 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](user/python/pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.5 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 

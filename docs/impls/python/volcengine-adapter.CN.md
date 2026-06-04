@@ -1,14 +1,15 @@
 # Python v0.4 Volcengine Adapter MVP 实现方案
 
-状态：已实现  
+文档类型：实现方案与实现记录
 日期：2026-05-14  
 最近更新：2026-05-28
+引入需求：[REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
 
 ## 定位
 
 v0.4 已实现 `vatbrain` Python 参考实现的第二个 provider adapter：Volcengine / 火山方舟。该阶段没有继续扩张 core 抽象，而是用火山方舟的 Responses API、Files API 与多模态 embedding 验证 v0.3 core 是否能够承载跨厂商差异。
 
-本方案是 [impls/python/evolution-plan.CN.md](impls/python/evolution-plan.CN.md) 中 v0.4 的详细实施设计。高层语义以 [design/high-level-design.CN.md](design/high-level-design.CN.md)、[design/provider-capability-integration.CN.md](design/provider-capability-integration.CN.md) 与 [design/provider-native-replay.CN.md](design/provider-native-replay.CN.md) 为准；当前 core/API family 基线见 [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)。
+本方案是 [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md) 中 v0.4 的详细实施设计。高层语义以 [high-level-design.CN.md](../../design/high-level-design.CN.md)、[provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md) 与 [provider-native-replay.CN.md](../../design/provider-native-replay.CN.md) 为准；当前 core/API family 基线见 [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)。
 
 ## 设计输入
 
@@ -29,12 +30,12 @@ v0.4 应优先复用这些 core 结构，避免为 Volcengine 临时新增平行
 
 本阶段重点参考：
 
-- [3rds/volengine/response_api_text_gen.md](3rds/volengine/response_api_text_gen.md)：Responses API 文本生成、Ark SDK 调用、`previous_response_id`、`store`、`caching`、streaming event、`instructions` 与上下文管理规则；资料中的 OpenAI-compatible 示例仅作为对照，不作为 v0.4 实现依据。
-- [3rds/volengine/response_api_multimodal_understanding.md](3rds/volengine/response_api_multimodal_understanding.md)：Responses API 支持图片、视频、文档输入；文件可通过 Files API 上传后用 `file_id` 引用，也可通过 URL/base64 传入；视频上传支持预处理 `fps`。
-- [3rds/volengine/response_api_reasoning.md](3rds/volengine/response_api_reasoning.md)：reasoning 由 `thinking.type` 与 `reasoning.effort` 控制；流式事件包含 reasoning summary；usage 中包含 `output_tokens_details.reasoning_tokens`。
-- [3rds/volengine/response_api_tool_calling.md](3rds/volengine/response_api_tool_calling.md)：Responses API function tool 使用 `tools` 声明，模型输出 `function_call`，用户通过 `function_call_output` 和 `call_id` 回填结果；Web Search、Image Process、Knowledge Search、Remote MCP 属于 provider-hosted/remote tools。
-- [3rds/volengine/file_api.md](3rds/volengine/file_api.md)：Files API 独立表达上传、检索、列表、删除、状态与过期时间。
-- [3rds/volengine/embeding.md](3rds/volengine/embeding.md)：Doubao 多模态 embedding 支持 text/image/video、`instructions`、dense vector、sparse vector 与 usage。
+- [response_api_text_gen.md](../../3rds/volengine/response_api_text_gen.md)：Responses API 文本生成、Ark SDK 调用、`previous_response_id`、`store`、`caching`、streaming event、`instructions` 与上下文管理规则；资料中的 OpenAI-compatible 示例仅作为对照，不作为 v0.4 实现依据。
+- [response_api_multimodal_understanding.md](../../3rds/volengine/response_api_multimodal_understanding.md)：Responses API 支持图片、视频、文档输入；文件可通过 Files API 上传后用 `file_id` 引用，也可通过 URL/base64 传入；视频上传支持预处理 `fps`。
+- [response_api_reasoning.md](../../3rds/volengine/response_api_reasoning.md)：reasoning 由 `thinking.type` 与 `reasoning.effort` 控制；流式事件包含 reasoning summary；usage 中包含 `output_tokens_details.reasoning_tokens`。
+- [response_api_tool_calling.md](../../3rds/volengine/response_api_tool_calling.md)：Responses API function tool 使用 `tools` 声明，模型输出 `function_call`，用户通过 `function_call_output` 和 `call_id` 回填结果；Web Search、Image Process、Knowledge Search、Remote MCP 属于 provider-hosted/remote tools。
+- [file_api.md](../../3rds/volengine/file_api.md)：Files API 独立表达上传、检索、列表、删除、状态与过期时间。
+- [embeding.md](../../3rds/volengine/embeding.md)：Doubao 多模态 embedding 支持 text/image/video、`instructions`、dense vector、sparse vector 与 usage。
 
 ## 设计哲学
 
@@ -705,12 +706,12 @@ Integration tests 不进入默认 CI，不作为本阶段文档验收条件。
 
 v0.4 已同步更新：
 
-- [impls/python/STATUS.md](impls/python/STATUS.md)
-- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)
-- [user/python/quickstart.CN.md](user/python/quickstart.CN.md)
-- [user/python/STATUS.md](user/python/STATUS.md)
-- 新增 [user/python/volcengine-quickstart.CN.md](user/python/volcengine-quickstart.CN.md)
-- [INDEX.md](INDEX.md)
+- [impls/python/STATUS.md](STATUS.md)
+- [api-reference.CN.md](../../user/python/api-reference.CN.md)
+- [quickstart.CN.md](../../user/python/quickstart.CN.md)
+- [user/python/STATUS.md](../../user/python/STATUS.md)
+- 新增 [volcengine-quickstart.CN.md](../../user/python/volcengine-quickstart.CN.md)
+- [docs/INDEX.md](../../INDEX.md)
 
 `docs/user/python` 已把“仅 OpenAI provider”的限制改为“OpenAI + Volcengine”，并明确 Volcengine 的支持范围与非范围。
 

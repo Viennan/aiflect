@@ -192,6 +192,6 @@ OpenAI Python SDK 支持把 Pydantic model 传给 `client.responses.parse(..., t
 
 ## 相关文档
 
-- [user/python/api-reference.CN.md](user/python/api-reference.CN.md)
-- [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)
-- [user/python/quickstart.CN.md](user/python/quickstart.CN.md)
+- [api-reference.CN.md](api-reference.CN.md)
+- [impls/python/pydantic-structured-output.CN.md](../../impls/python/pydantic-structured-output.CN.md)
+- [quickstart.CN.md](quickstart.CN.md)

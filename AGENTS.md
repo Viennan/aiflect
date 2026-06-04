@@ -6,12 +6,7 @@ This project named `vatbrain` defines a general-purpose LLM inference invocation
 
 ## Core Project Directories
 
-- `docs` - The documentation knowledge base for this product. Its internal structure may evolve with the product, but `docs/INDEX.md` should remain the primary entry point for navigating the knowledge base.
-  - `user` - Dir for user documents.
-  - `design` - Dir for highlevel design documents.
-  - `impls` - Dir for lowlevel implementation documents guided by `design` folder.
-  - `3rds` - 3rd-party reference docs.
-  - `INDEX.md` - Index file for the knowlege base.
+- `docs` - Product knowledge base. See [Knowledge Base](#knowledge-base) for organization, maintenance rules, and usage guidance.
 - `.devcontainer` - Development container configuration for local and remote development environments.
 - `.venv` - The virtual python env for developing and testing python codes and executing python scripts in `scripts` folder.
 - `scripts` - Scripts for development, testing, installation, and other automated workflows of this project.
@@ -23,6 +18,46 @@ This project named `vatbrain` defines a general-purpose LLM inference invocation
   - `tests` - All unittests.
   - `pyproject.toml` - For python packaging.
 
+## Knowledge Base
+
+The `docs` directory is the persistent product knowledge base. It records product design, implementation intent, user-facing behavior, and third-party references across sessions and feature work. Its internal structure may evolve, but `docs/INDEX.md` remains the primary entry point for navigation and recall.
+
+### Organization
+
+- `docs/INDEX.md` - Central index and summary for quickly locating knowledge-base documents.
+- `docs/requirements` - Requirement management documents, including a lightweight status overview and per-requirement management records. Requirement state belongs here, not in design or implementation documents.
+- `docs/design` - High-level design documents, including product design philosophy, module responsibilities, architecture, and development-facing design materials.
+- `docs/impls` - Implementation details guided by `docs/design`; organize language-specific implementation documents under language directories such as `docs/impls/python`.
+- `docs/user` - User-facing documentation; organize language-specific user documents under language directories such as `docs/user/python`.
+- `docs/3rds` - Local snapshots or excerpts of third-party reference materials. These are fact sources for analysis and adapter implementation, not direct product design commitments.
+- Each language-specific variant under `docs/impls` or `docs/user` uses its own `STATUS.md` to describe currently implemented features and TODOs.
+
+### Maintenance Rules
+
+- Maintain `docs/INDEX.md` with an index entry and short summary for each knowledge-base document.
+- In `docs/design`, make "Design Philosophy" and "Module Responsibilities" clear and explicit. Other sections may be expanded or condensed as appropriate.
+- Keep `docs/design` focused on high-level guidance rather than detailed implementation mechanics.
+- Place implementation details under `docs/impls` and keep them aligned with the corresponding design documents.
+- Place user-facing documentation under `docs/user` when that area is introduced or expanded.
+- Track requirement lifecycle state and coarse implementation progress under `docs/requirements`. Design, implementation, and user documents may link to the requirement that introduced a change, but should not carry the requirement's current management state.
+- Only maintain requirement records for changes that involve project non-test code. Documentation-only, test-only, workflow-only, or repository housekeeping changes are outside requirement management.
+- Keep requirement-management templates in the knowledge base, for example under `docs/requirements`, rather than embedding template details in `AGENTS.md`. Treat templates as adaptable starting points rather than fixed formats.
+- When organizing content discussed in `design mode` into the knowledge base, preserve reference links and compile the user's questions into an FAQ.
+- Use Markdown links relative to the current document when referencing other documents in the knowledge base. Link text should prefer the target document file name; add the minimal directory prefix when needed to distinguish duplicate file names such as `impls/python/STATUS.md` and `user/python/STATUS.md`.
+- When reviewing documents, refer to both design documents and code implementation. If they conflict, notify the user and do not make changes without authorization.
+- Do not alter content in the `docs` directory without the user's permission.
+- When the user agrees to modify product design, synchronously update the relevant design documents.
+- When modifications affect public behavior, synchronously update the relevant user or implementation documents.
+
+### Usage
+
+- `docs/INDEX.md` is a useful starting point when recalling product design, implementation intent, or user-facing behavior.
+- Pay close attention to the "Design Philosophy" and "Module Responsibilities" in `docs/design`; they may encode intent that is not obvious from source code alone.
+- Use `docs/impls` to recover implementation details, especially subjective decisions, adapter boundaries, and historical implementation rationale.
+- During project iteration, `docs/requirements/STATUS.md` can be a useful heuristic entry point for discovering active requirements and their coarse progress. Coding agents should still choose the most relevant documents based on the user's request and local context.
+- Treat `docs/3rds` as third-party fact sources. Product semantics should be derived from `docs/design`, not directly from third-party reference snapshots.
+- In `design mode`, integrate the current product design and code architecture before giving a research report or proposing a design change.
+
 ## Design Mode
 
 `design mode` is an exploratory research mode where you discuss product architecture and brainstorm with the user. When the user asks you to enter `design mode`, please adhere to the following rules:
@@ -31,23 +66,6 @@ This project named `vatbrain` defines a general-purpose LLM inference invocation
 - Thoroughly understand the user's questions and provide inspiring and constructive feedback in the form of a research report, integrating current product design and code architecture.
 - The research report should focus more on high-level design and provide guidance, rather than getting bogged down in specific details.
 - Reference and cite authoritative sources when necessary to improve research quality, and provide the sources (links) of references.
-
-## Doc Maintaining Rules
-
-When maintaining documents in the `docs` directory, the following rules should be followed:
-
-- The `docs` directory serves as the knowledge base for this product. Maintain an index and summary of each document in `docs/INDEX.md` for quick lookup.
-- The `docs/design` directory contains the product's design documents, including product design philosophy, module responsibilities (What does this module stand for? More emphasis on high-level semantics.), architecture, and related development-facing materials.
-- For docs in `docs/design`, "Design Philosophy" and "Module Responsibilities" are more important things which should be clearly and explicitly, while the other parts can be elaborated or condensed as appropriate.
-- Docs in `docs/design` should provide more high-level guidance rather than concrete implementation details, so avoid including too many implementation specifics when updating.
-- The `docs/impls` directory contains the implementation details under the guidance of `docs/design`.
-- User-facing documentation should live under `docs/user` when that area is introduced or expanded.
-- When organizing content discussed in `design mode` into the knowledge base, ensure that reference links are preserved, and compile the user's questions into an FAQ for storage.
-- Use base file name or full name up to `docs` dir (should be clean and not including `docs`) with its relative path (comparing to `docs`) as the linking url to reference other doc in the knowlege base.
-- When reviewing documents, refer to both design documents and code implementation. In case of conflicts, notify the user and do not make changes without authorization.
-- Do not alter the content in the `docs` directory without the user's permission.
-- Organize files under the `docs/impl` and `docs/user` directories based on programming language dimensions.
-- Each language-specific variant uses its own `STATUS.md` to describe the currently implemented features and TODOs.
 
 ## Engineering Rules
 
@@ -80,10 +98,3 @@ When maintaining documents in the `docs` directory, the following rules should b
 - The Python version used in this project is 3.12. Actively use mature and proven new features to implement functionality, and avoid outdated features with legacy burdens.
 - Use `.venv` in the project root as the Python development environment for this project. All Python code, including tests, must be run within this environment and must not pollute the system environment.
 - Maintain a `python/pyproject.toml` for packaging, or as a reference for recovering the project-root `.venv`.
-
-## Recommendations
-
-- Consider the documentation under `docs` as a persistent, global memory pool for recall designations and implementation specifics across different sessions and feature development processes.
-- Use `docs/INDEX.md` to quickly recall the product design and use it as an index to load other documents as needed.
-- Pay great attention to the "Design Philosophy" and "Module Resposibilites" in docs of `docs/design`, which may not be clearly infered only from code.
-- The files under `docs/impls` are invaluable for recalling implementation details, particularly those involving subjective intent, when the source code alone proves insufficient or ambiguous.

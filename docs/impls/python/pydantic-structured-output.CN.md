@@ -1,8 +1,9 @@
 # Python Pydantic Structured Output 便捷层方案
 
-状态：已实现  
+文档类型：实现方案与实现记录
 日期：2026-05-11  
 最近更新：2026-05-11
+引入需求：[REQ-2026-05-python-pydantic-structured-output.CN.md](../../requirements/REQ-2026-05-python-pydantic-structured-output.CN.md)
 
 ## 背景
 
@@ -10,7 +11,7 @@
 
 OpenAI Python SDK 已提供类似体验：用户可以把 Pydantic model 传给 `client.responses.parse(..., text_format=Model)`，SDK 会生成 structured output schema，并在响应上提供 `output_parsed`。`vatbrain` 应参考这种编程体验，但不能绕过现有 provider-neutral request mapping、provider-native replay、snapshot 和 fallback 机制。
 
-本方案补充 [impls/python/v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md) 与 [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md) 中的 structured output 设计，定位为 Python 语言层便捷能力，而不是新的 provider core 抽象。
+本方案补充 [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md) 与 [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md) 中的 structured output 设计，定位为 Python 语言层便捷能力，而不是新的 provider core 抽象。
 
 ## 设计目标
 
@@ -299,5 +300,5 @@ OpenAI SDK 已展示 structured output streaming parse 的方向，但 vatbrain 
 - [OpenAI Python SDK helpers](https://github.com/openai/openai-python/blob/main/helpers.md)
 - [Pydantic TypeAdapter docs](https://docs.pydantic.dev/latest/api/type_adapter/)
 - [Pydantic JSON Schema docs](https://docs.pydantic.dev/latest/concepts/json_schema/)
-- [impls/python/v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)
-- [impls/python/v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)
+- [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
+- [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
