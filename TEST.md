@@ -33,8 +33,8 @@ Costly tests must be isolated by pytest markers:
 - `feature(name)`: identifies the API family, such as `generation`,
   `embedding`, `files`, `image_generation`, or `video_generation`.
 
-The default test workflow must exclude costly tests. A future costly-test runner
-script should run them only after explicit user confirmation:
+The default test workflow must exclude costly tests. The costly-test runner
+script runs them only after explicit user confirmation:
 
 ```bash
 scripts/run-costly-tests --provider volcengine --feature generation --profile cheap
@@ -43,6 +43,16 @@ scripts/run-costly-tests --provider volcengine --feature generation --profile ch
 Non-interactive usage must require an explicit consent flag, such as `--yes`.
 The runner must print the provider, features, selected profiles, and selected
 model IDs before asking for confirmation.
+
+The current costly smoke-test framework covers text generation, text embedding,
+image-to-text generation, and image embedding model cases from `creds.json`.
+Image-input tests use raw inline data from `asserts`; they do not upload
+assertion assets through provider File APIs. Provider optional dependencies must
+be installed before running the matching costly tests, for example:
+
+```bash
+.venv/bin/python -m pip install -e "python[volcengine,test]"
+```
 
 ### Costly Credentials
 
@@ -200,7 +210,9 @@ File API tests must:
                     "capabilities": {
                         "supports_text_embedding": true,
                         "supports_multimodal_embedding": true,
-                        "output_dimensions": 1024
+                        "supports_sparse_embedding": true,
+                        "input_modalities": ["text", "image"],
+                        "output_dimensions": 2048
                     }
                 }
             ]

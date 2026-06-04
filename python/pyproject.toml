@@ -29,3 +29,8 @@ packages = ["whero"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "costly: tests that may call real provider APIs or create billable usage",
+    "provider(name): provider targeted by a costly test",
+    "feature(name): provider feature family targeted by a costly test",
+]
