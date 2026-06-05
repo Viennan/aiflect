@@ -1,7 +1,7 @@
 # 需求状态总览
 
 状态：持续维护
-最近更新：2026-06-04
+最近更新：2026-06-06
 
 ## 定位
 
@@ -30,6 +30,7 @@
 
 | Requirement | Status | Progress | Requirement Doc | Key Docs | Updated |
 | --- | --- | --- | --- | --- | --- |
+| Python Anthropic adapter | `Completed` | Anthropic Messages API generation/streaming、图片理解、function tools、automatic prefix caching 和 capability 已落地 | [REQ-2026-06-python-anthropic-adapter.CN.md](REQ-2026-06-python-anthropic-adapter.CN.md) | [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md), [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md), [anthropic-quickstart.CN.md](../user/python/anthropic-quickstart.CN.md) | 2026-06-06 |
 | Python reference implementation roadmap | `Completed` | v0.2 到 v0.5 阶段目标已完成，后续关注项保留在需求文档中 | [REQ-2026-05-python-reference-implementation-roadmap.CN.md](REQ-2026-05-python-reference-implementation-roadmap.CN.md) | [impls/python/STATUS.md](../impls/python/STATUS.md) | 2026-06-04 |
 | Python OpenAI adapter | `Completed` | 首个 provider adapter 与基础 core 能力已落地 | [REQ-2026-05-python-openai-adapter.CN.md](REQ-2026-05-python-openai-adapter.CN.md) | [openai-adapter.CN.md](../impls/python/openai-adapter.CN.md) | 2026-06-04 |
 | Python Pydantic structured output | `Completed` | Pydantic helper、strict schema 和 parsed response convenience 已落地 | [REQ-2026-05-python-pydantic-structured-output.CN.md](REQ-2026-05-python-pydantic-structured-output.CN.md) | [impls/python/pydantic-structured-output.CN.md](../impls/python/pydantic-structured-output.CN.md), [user/python/pydantic-structured-output.CN.md](../user/python/pydantic-structured-output.CN.md) | 2026-06-04 |

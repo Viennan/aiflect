@@ -1,0 +1,229 @@
+# Anthropic Provider 支持设计
+
+状态：设计稿
+日期：2026-06-05
+最近更新：2026-06-05
+
+## 背景
+
+Anthropic Claude Messages API 是无状态 messages 调用面，支持文本、图片理解、工具调用、streaming、extended thinking、structured output 与 prompt caching。`vatbrain` 的核心 generation 模型已经具备 full-context `Item` 序列、user-executed function tools、stream event、usage、capability、provider-native snapshot 和 `RemoteContextHint`。
+
+本设计将 Anthropic provider 纳入 `vatbrain` provider adapter 体系，同时避免把 Anthropic cache 或 Messages API 的 provider-specific 细节提升为通用 core 字段。
+
+相关需求记录见 [REQ-2026-06-python-anthropic-adapter.CN.md](../requirements/REQ-2026-06-python-anthropic-adapter.CN.md)，Python 实现计划见 [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md)。
+
+## Design Philosophy
+
+### Full-context First 不变
+
+Anthropic adapter 必须继续要求用户传入完整 `items` 序列。Anthropic prompt cache 只降低重复前缀成本，不成为 `vatbrain` 的上下文事实来源。
+
+对 Anthropic 而言，`RemoteContextHint.previous_response_id` 不代表 provider-side continuation handle。即使用户传入该字段，adapter 也不裁剪 `items`，不发送 suffix，不依赖 response id 恢复上下文。
+
+### Cache as Store Hint
+
+为了兼容 OpenAI/Volcengine Responses API 风格的用户代码，Anthropic adapter 将 `RemoteContextHint.store=True` 解释为“请求 provider 保存/复用上下文前缀的优化意图”，并在 provider 请求中启用 Anthropic automatic prefix caching。
+
+该映射是 provider-local 解释：
+
+```text
+RemoteContextHint.store=True
+  -> Anthropic messages.create(cache_control={"type": "ephemeral"})
+```
+
+`RemoteContextHint.previous_response_id` 与 `covered_item_count` 在 Anthropic adapter 中被忽略。这样用户可以读取 `GenerationResponse.id`，也可以把该 id 传回 `RemoteContextHint.previous_response_id`，但 Anthropic adapter 不把它当作远端上下文 ID 使用。
+
+### No Explicit Anthropic Cache Surface
+
+MVP 不暴露 Anthropic explicit cache control：
+
+- 不在 `Item` 上增加 cache 字段。
+- 不在 `TextPart`、`ImagePart` 或其他 content part 上增加 cache 字段。
+- 不在 `ToolSpec` 上增加通用 cache 字段。
+- 不通过 provider-specific `provider_options` 公开 explicit block-level cache API 作为正式编程模型。
+- `cache_control` 是 Anthropic adapter 保留字段，只能由 `RemoteContextHint.store=True` 生成；用户在 request、remote context 或 tool 的 `provider_options` 中显式传入 `cache_control` 时，adapter 应抛出不支持错误，而不是静默当作 explicit cache control。
+
+短期只支持 automatic prefix caching，避免在 core 里过早固化 provider-specific cache breakpoint 语义。
+
+### Tool Ownership Remains User-executed
+
+Anthropic 支持 client tools、server tools、MCP、web search、code execution 和 SDK Tool Runner。`vatbrain` 当前通用 core 只抽象 user-executed function tools，且不自动执行工具。因此 Anthropic MVP 只支持 client-side function tools：
+
+- `FunctionToolSpec(type="function")` 映射为 Anthropic tool。
+- Anthropic `tool_use` 映射为 `FunctionCallItem`。
+- 用户执行工具后以 `FunctionResultItem` 回填，映射为 Anthropic `tool_result`。
+
+Provider-hosted/server tools 和 SDK Tool Runner 暂不进入范围。
+
+## Module Responsibilities
+
+### Core
+
+Core 不为 Anthropic adapter 增加新字段。现有模型已经足够表达 MVP：
+
+- `GenerationRequest.items`：完整语义上下文。
+- `RemoteContextHint.store`：作为 provider-side cache/store 优化意图。
+- `RemoteContextHint.previous_response_id`：兼容 response-id 风格用户代码，但 Anthropic adapter 忽略。
+- `ToolSpec` / `FunctionToolSpec`：user-executed function tool schema。
+- `FunctionCallItem` / `FunctionResultItem`：tool use 和 tool result 协议。
+- `Usage.cached_tokens` 与 `Usage.metadata`：cache 命中与写入统计。
+- `ProviderItemSnapshot`：保存 Anthropic content block 或 message payload，用于同 provider replay。
+
+### Anthropic Provider Adapter
+
+Provider adapter 负责：
+
+- 将 `GenerationRequest` 映射到 Anthropic `messages.create` 参数。
+- 将 Anthropic response content blocks 映射为 `MessageItem`、`FunctionCallItem`、`ReasoningItem` 等 normalized items。
+- 将 Anthropic streaming events 映射为 `GenerationStreamEvent`。
+- 将 Anthropic usage 中的 cache read/create token 归一化为 `Usage`。
+- 声明 adapter capability 和 model capability。
+
+Anthropic adapter 不负责：
+
+- 自动执行工具。
+- 维护对话状态。
+- 对 `previous_response_id` 做远端上下文恢复。
+- 暴露 File API、embedding 或 media generation。
+
+## Core Semantics
+
+### RemoteContextHint 语义
+
+Anthropic adapter 对 `RemoteContextHint` 的解释如下：
+
+```text
+store=True
+  -> enable automatic prompt caching
+
+store=False 或 None
+  -> do not send cache_control
+
+previous_response_id
+  -> ignored
+
+covered_item_count
+  -> ignored by Anthropic adapter
+```
+
+因此 Anthropic generation 永远是：
+
+```text
+semantic input: full GenerationRequest.items
+transport input: full Anthropic messages
+optional optimization: automatic prefix cache
+```
+
+它与 OpenAI/Volcengine 的差异是：
+
+- OpenAI/Volcengine 可以在 `previous_response_id + covered_item_count` 明确时发送 suffix。
+- Anthropic 不发送 suffix，只启用 automatic prefix cache。
+
+### Response Id 兼容
+
+`GenerationResponse.id` 可以返回 Anthropic message id。如果 provider response 没有 id，或者 adapter 未来选择不暴露该 id，则允许为 `None`。
+
+用户可以把该 id 传入下一轮：
+
+```text
+RemoteContextHint(previous_response_id=response.id or "", store=True)
+```
+
+Anthropic adapter 必须接受并忽略该值。这为跨 provider 用户代码提供形状兼容，但不暗示 Anthropic 存在 Responses API 风格的 previous response 语义。
+
+### Cache Usage 归一化
+
+Anthropic usage 包含：
+
+- `input_tokens`
+- `output_tokens`
+- `cache_creation_input_tokens`
+- `cache_read_input_tokens`
+
+归一化建议：
+
+```text
+Usage.input_tokens = input_tokens + cache_creation_input_tokens + cache_read_input_tokens
+Usage.output_tokens = output_tokens
+Usage.cached_tokens = cache_read_input_tokens
+Usage.total_tokens = Usage.input_tokens + output_tokens
+Usage.raw = provider raw usage
+Usage.metadata["provider_input_tokens"] = input_tokens
+Usage.metadata["cache_creation_input_tokens"] = cache_creation_input_tokens
+Usage.metadata["cache_read_input_tokens"] = cache_read_input_tokens
+```
+
+这样 `Usage.input_tokens` 表达完整 input token 规模，而 `cached_tokens` 表达其中由 cache 命中的部分。
+
+## Capability Guidance
+
+Anthropic adapter capability 建议声明：
+
+```text
+supports_generation=True
+supports_stream_generation=True
+supports_async=True
+supports_text_embedding=False
+supports_multimodal_embedding=False
+supports_function_tools=True
+supports_usage_mapping=True
+```
+
+Generation capability：
+
+```text
+input_modalities=("text", "image")
+output_modalities=("text",)
+structured_output=根据 MVP 决策设置
+reasoning_config=根据 MVP 决策设置
+reasoning_output=True if thinking blocks mapped
+remote_context=True
+function_tools=True
+```
+
+`remote_context=True` 的含义需要在 metadata 中明确：
+
+```text
+metadata["remote_context_semantics"] =
+  "store maps to Anthropic automatic prompt caching; previous_response_id is ignored; no transport delta"
+```
+
+Tool capability：
+
+```text
+user_function_tools=True
+custom_tools=False
+parallel_tool_calls=True
+tool_choice=True
+```
+
+其中 `custom_tools=False` 指 vatbrain 的 `FunctionToolType.CUSTOM`，不是指用户自定义 function tool。
+
+## FAQ
+
+### 为什么不把 Anthropic cache control 做成 core 字段？
+
+因为本阶段只需要 automatic prefix caching。Explicit cache breakpoint 涉及 system、tools、message content block 等 provider-specific 标记位置，过早提升为 core 字段会污染通用 `Item` 模型。
+
+### 为什么 `RemoteContextHint.previous_response_id` 要接受但忽略？
+
+这是为了兼容 Responses API 风格的用户代码。用户可以用同一种形状传递 response id 和 store hint；Anthropic adapter 用 `store=True` 开 cache，忽略 id，仍发送完整上下文。
+
+### 忽略 `covered_item_count` 会不会破坏 Full-context First？
+
+不会。Full-context First 要求用户传入完整 `items` 作为语义事实来源。Anthropic adapter 不裁剪 items，反而是最直接地遵守该原则。
+
+### 为什么不使用 Anthropic SDK Tool Runner？
+
+`vatbrain` 明确不自动执行工具。SDK Tool Runner 会运行工具并继续提交结果，属于 agent loop 行为，不属于 provider adapter 的职责。
+
+## 参考资料
+
+- [high-level-design.CN.md](high-level-design.CN.md)
+- [provider-capability-integration.CN.md](provider-capability-integration.CN.md)
+- [provider-native-replay.CN.md](provider-native-replay.CN.md)
+- Anthropic Messages API：https://docs.anthropic.com/en/api/messages
+- Anthropic Python SDK：https://docs.anthropic.com/en/api/sdks/python
+- Anthropic prompt caching：https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+- Anthropic tool use：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+- Anthropic vision：https://docs.anthropic.com/en/docs/build-with-claude/vision

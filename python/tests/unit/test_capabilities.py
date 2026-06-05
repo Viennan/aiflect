@@ -4,6 +4,7 @@ import pytest
 
 from whero.vatbrain import CapabilitySource
 from whero.vatbrain.core.capabilities import CapabilityValue, GenerationCapability
+from whero.vatbrain.providers.anthropic import AnthropicClient
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
@@ -59,6 +60,27 @@ def test_volcengine_adapter_capability_declares_media_generation() -> None:
     assert capability.media_generation.output_formats.value == ("png", "jpeg")
     assert capability.media_generation.image_background_control.value is False
     assert capability.media_generation.image_background_values.value == ()
+
+
+def test_anthropic_adapter_capability_declares_generation_only_surface() -> None:
+    client = AnthropicClient(client=object(), async_client=object())
+
+    capability = client.get_adapter_capability()
+
+    assert capability.provider == "anthropic"
+    assert capability.supports_generation is True
+    assert capability.supports_stream_generation is True
+    assert capability.supports_async is True
+    assert capability.supports_text_embedding is False
+    assert capability.supports_multimodal_embedding is False
+    assert capability.supports_function_tools is True
+    assert capability.generation is not None
+    assert capability.generation.input_modalities.value == ("text", "image")
+    assert capability.generation.remote_context.value is True
+    assert capability.generation.metadata["remote_context_semantics"].startswith("store maps")
+    assert capability.tools is not None
+    assert capability.tools.user_function_tools.value is True
+    assert capability.tools.custom_tools.value is False
 
 
 def test_model_capability_defaults_to_unknown_and_accepts_overrides() -> None:

@@ -1,12 +1,12 @@
 # Python API 参考
 
-状态：v0.5
+状态：v0.6
 日期：2026-05-13
-最近更新：2026-05-31
+最近更新：2026-06-06
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.5 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.6 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine / Anthropic adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Anthropic provider 用法见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 
@@ -28,6 +28,7 @@ Provider client 从各 provider 包导入：
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
+from whero.vatbrain.providers.anthropic import AnthropicClient
 ```
 
 Pydantic structured output helper 从 `whero.vatbrain.structured` 导入：
@@ -64,7 +65,7 @@ config = ClientConfig(
 
 ### OpenAIClient
 
-当前已实现 provider：OpenAI、Volcengine。
+当前已实现 provider：OpenAI、Volcengine、Anthropic。
 
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
@@ -169,6 +170,51 @@ Volcengine client 方法：
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
+### AnthropicClient
+
+Anthropic provider 使用官方 Anthropic Python SDK 的 Messages API。
+
+```python
+from whero.vatbrain.providers.anthropic import AnthropicClient
+
+client = AnthropicClient(api_key="...")
+```
+
+安装 extra：
+
+```bash
+cd python
+../.venv/bin/python -m pip install -e ".[anthropic]"
+```
+
+Anthropic API key 必须在初始化时显式传入，或通过 `ClientConfig(api_key=...)` 提供：
+
+```python
+client = AnthropicClient(api_key="...", base_url="...", timeout=30.0)
+```
+
+初始化参数：
+
+- `config`：`ClientConfig`。
+- `api_key`、`base_url`、`timeout`、`max_retries`：覆盖 `config` 中的同名字段。
+- `client`：注入已有同步 Anthropic SDK client，常用于测试或复用连接。
+- `async_client`：注入已有异步 Anthropic SDK client。
+- `model_capability_overrides`：用户侧模型能力覆写。
+- `**anthropic_client_options`：透传给 Anthropic SDK client 的初始化参数；其中已知 secret 字段会以 `SecretString` 保存。
+
+Anthropic client 方法：
+
+- `generate(...) -> GenerationResponse`
+- `agenerate(...) -> GenerationResponse`
+- `stream_generate(...) -> Iterator[GenerationStreamEvent]`
+- `astream_generate(...) -> AsyncIterator[GenerationStreamEvent]`
+- `get_adapter_capability() -> AdapterCapability`
+- `get_model_capability(model, overrides=None) -> ModelCapability`
+
+Anthropic adapter 支持文本、图片理解、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
+
+Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ResponseFormat` 或 `ReasoningConfig` 请求映射。`RemoteContextHint.store=True` 会启用 automatic prompt caching；`previous_response_id` 与 `covered_item_count` 会被接受但忽略，不触发差分传输。
+
 ## Items
 
 `Item` 是 generation 上下文和模型输出的核心单位。v0.3 的 `Item` 联合类型包含：
@@ -248,6 +294,8 @@ FilePart(local_path="./contract.pdf", mime_type="application/pdf")
 ```
 
 `local_path` 只是 metadata，不会自动读取或上传文件。需要 provider 文件资源时，应使用对应 provider adapter 的显式 file/resource API。OpenAI adapter 尚未暴露文件管理方法；Volcengine adapter 已支持 Ark Files API。
+
+Anthropic adapter 仅在 generation 中支持 `TextPart` 与 user message 中的 `ImagePart`。`AudioPart`、`VideoPart`、`FilePart` 不会映射到 Anthropic Messages API。
 
 ### FunctionCallItem
 
@@ -449,7 +497,7 @@ reasoning = ReasoningConfig(
 )
 ```
 
-不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。Volcengine adapter 将 `mode` 映射为 Ark `thinking.type`，将 `effort` 映射为 `reasoning.effort`。
+不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。Volcengine adapter 将 `mode` 映射为 Ark `thinking.type`，将 `effort` 映射为 `reasoning.effort`。Anthropic adapter 暂不支持 `ReasoningConfig` 请求映射；传入该配置会抛 `UnsupportedCapabilityError`。Provider 返回的 thinking content block 会尽量映射为 `ReasoningItem`。
 
 ### ToolCallConfig
 
@@ -1301,4 +1349,38 @@ from whero.vatbrain.core.errors import (
 - provider-hosted tools、remote tools、MCP tools 的稳定通用抽象。
 - provider conversation 持久化上下文抽象。
 - 本地文件隐式上传。
+- 跨 provider replay。
+
+## Anthropic Adapter 支持范围
+
+当前 Anthropic adapter 支持：
+
+- 官方 Anthropic SDK Messages API 调用路径。
+- Messages API generation。
+- Messages API streaming。
+- async generation / streaming。
+- text/image input。
+- initial system/developer instruction prefix 映射为 Anthropic top-level `system`。
+- user function tool。
+- `tool_use` -> `FunctionCallItem`。
+- `FunctionResultItem` -> `tool_result`。
+- `RemoteContextHint.store=True` 映射为 automatic prefix caching。
+- `previous_response_id` 与 `covered_item_count` 兼容接收但忽略。
+- provider-native content block snapshot replay。
+- usage cache token mapping。
+- adapter/model capability 查询与用户覆写。
+
+当前 Anthropic adapter 不支持：
+
+- Files API。
+- embedding。
+- media generation。
+- `previous_response_id` 差分传输。
+- remote context invalid fallback。
+- `ResponseFormat` structured output。
+- `ReasoningConfig` 请求映射。
+- `FunctionToolType.CUSTOM`。
+- 显式 Anthropic `cache_control`。
+- provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
+- provider conversation 持久化上下文抽象。
 - 跨 provider replay。

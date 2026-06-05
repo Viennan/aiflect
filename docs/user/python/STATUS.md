@@ -1,14 +1,15 @@
 # Python 用户文档状态
 
-状态：v0.5 已系统化整理
+状态：v0.6 已系统化整理
 日期：2026-05-05
-最近更新：2026-05-31
+最近更新：2026-06-06
 
 ## 当前文档
 
 - [quickstart.CN.md](quickstart.CN.md)：渐进式用户指南，从安装、client 初始化、generation、remote context/replay、streaming、图片/视频生成、structured output、tools、embedding、capability 到错误处理。
 - [api-reference.CN.md](api-reference.CN.md)：Python public API 参考，覆盖当前暴露给用户的 core dataclass、enum、provider client、media generation、Pydantic helper、capability、usage 与错误类型。
 - [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，覆盖 Ark SDK-only 安装、generation、streaming、图片生成、视频任务、Files API、多模态 embedding、function tools、remote context 与限制。
+- [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)：Anthropic provider 快速开始，覆盖官方 Anthropic SDK Messages API 安装、generation、图片理解、automatic prefix caching、streaming、function tools、capability 与限制。
 - [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)：Pydantic structured output 编程模型，说明 helper、默认 schema 行为、strict schema、解析与错误处理。
 
 ## 已覆盖
@@ -35,6 +36,17 @@
   - Ark Images API 图片生成、参考图生成与图片流式生成。
   - Ark Content Generation 视频任务创建、查询与轮询。
   - provider-native replay 与 previous response 差分传输。
+  - capability 查询。
+- Anthropic provider client：
+  - `whero-vatbrain[anthropic]` optional dependency。
+  - 显式凭据初始化与 SecretString 存储。
+  - 官方 Anthropic SDK Messages API 调用边界。
+  - 同步/异步 generation 与 streaming。
+  - text/image input。
+  - user-executed function tools。
+  - `RemoteContextHint.store=True` 映射为 automatic prefix caching。
+  - `previous_response_id` 与 `covered_item_count` 兼容接收但忽略，不做差分传输。
+  - usage cache token 映射。
   - capability 查询。
 - Generation：
   - Full-context First 编程模型。
@@ -79,9 +91,10 @@
   - `VideoGenerationRequest`。
   - usage、capability、errors。
 - 限制：
-  - 已实现 OpenAI 与 Volcengine provider。
+  - 已实现 OpenAI、Volcengine 与 Anthropic provider。
   - OpenAI 文本 generation 仅 Responses API。
   - Volcengine 文本 generation 仅 Ark SDK Responses API，不使用 OpenAI-compatible surface。
+  - Anthropic 文本 generation 仅官方 Anthropic SDK Messages API；不支持 Files API、embedding、media generation、`ResponseFormat` 和 `ReasoningConfig` 请求映射。
   - OpenAI 图片生成仅直接使用 Images API，不使用 Responses API hosted image generation tool。
   - Volcengine 图片/视频生成仅使用 Ark SDK 原生 Images API 与 Content Generation tasks。
   - 不自动工具执行。

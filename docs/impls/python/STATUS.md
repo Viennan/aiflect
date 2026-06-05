@@ -1,8 +1,8 @@
 # Python 实现状态
 
-状态：v0.5 已完成
+状态：v0.6 Anthropic adapter 已完成
 日期：2026-05-05
-最近更新：2026-05-31
+最近更新：2026-06-06
 
 ## 定位
 
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media Generation，在 v0.4 Volcengine adapter MVP 基础上接入 OpenAI Images API、Volcengine Ark Images API 与 Volcengine Content Generation 视频任务。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter，在 v0.5 Media Generation 基础上接入官方 Anthropic SDK Messages API generation、streaming、图片理解、user-executed function tools 和 automatic prefix caching。
 
 核心文档：
 
@@ -19,6 +19,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 - [provider-native-replay.CN.md](../../design/provider-native-replay.CN.md)
 - [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
 - [volcengine-adapter.CN.md](volcengine-adapter.CN.md)
+- [anthropic-adapter.CN.md](anthropic-adapter.CN.md)
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
@@ -31,7 +32,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
 - Python 包脚手架与 `pyproject.toml`。
 - 通用 client 初始化配置：`ClientConfig`。
 - `SecretString`：provider adapter 用于存储 LLM API key。
-- OpenAI / Volcengine adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
+- OpenAI / Volcengine / Anthropic adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
 - 默认单元测试不依赖真实 provider API。
 
 ### Core
@@ -179,6 +180,38 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.5 Media G
   - adapter capability 声明 generation/streaming/async/function tools/files/multimodal embedding/sparse embedding/media generation/usage。
   - model capability 默认 unknown，支持用户 overrides。
 
+### Anthropic Adapter
+
+- Provider package：`whero.vatbrain.providers.anthropic`。
+- Optional dependency：`whero-vatbrain[anthropic]`，使用 `anthropic>=0.105.2,<1`。
+- Client：`AnthropicClient`。
+- API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
+- 严格使用官方 Anthropic SDK 原生 surface：
+  - `Anthropic` / `AsyncAnthropic`。
+  - `messages.create`。
+- Messages generation：
+  - text/image input。
+  - initial system/developer instruction prefix 映射为 Anthropic top-level `system`。
+  - Anthropic Messages API 要求 `max_tokens`；通过 `GenerationConfig.max_output_tokens` 或 provider-native `provider_options["max_tokens"]` 提供。
+  - user-executed function tools。
+  - `tool_use` -> `FunctionCallItem`。
+  - `FunctionResultItem` -> `tool_result`。
+  - `thinking` / `redacted_thinking` content block 尽量映射为 `ReasoningItem`。
+  - provider-native content block snapshot 与 same-provider replay。
+  - usage/cache token mapping。
+- Automatic prefix caching：
+  - `RemoteContextHint.store=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
+  - `previous_response_id` 与 `covered_item_count` 兼容接收但忽略。
+  - 不做 `previous_response_id` 差分传输。
+  - 不暴露 explicit cache control；显式传入 `cache_control` 会抛 `UnsupportedCapabilityError`。
+- Messages streaming：
+  - message lifecycle、text delta、tool input JSON delta、thinking delta、usage update、completed/error 与 unknown passthrough。
+- Capability：
+  - adapter capability 声明 generation/streaming/async/function tools/usage。
+  - text/image input modality。
+  - 不支持 embedding、Files API、media generation、provider-hosted/server tools、SDK Tool Runner。
+  - model capability 默认 unknown，支持用户 overrides。
+
 ## 暂不实现
 
 - 自动 provider routing。
@@ -222,4 +255,4 @@ cd python
 ../.venv/bin/python -m pytest
 ```
 
-当前 v0.5 基线：`168 passed`。
+当前 v0.6 基线：`185 passed, 6 skipped`。

@@ -15,6 +15,9 @@ dependencies = [
 pydantic = [
     "pydantic>=2,<3",
 ]
+anthropic = [
+    "anthropic>=0.105.2,<1",
+]
 volcengine = [
     "volcengine-python-sdk[ark]>=5.0.30,<6",
 ]
