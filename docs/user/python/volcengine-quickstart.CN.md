@@ -288,13 +288,13 @@ Volcengine embedding 每次只提交一个 `EmbeddingInput`，该输入内部可
 ## Remote Context 与 Replay
 
 ```python
-from whero.vatbrain import MessageItem, RemoteContextHint, ReplayPolicy
+from whero.vatbrain import MessageItem, RemoteContextHint
 
 first_items = [MessageItem.user("Summarize this topic.")]
 first = client.generate(
     model="doubao-seed-1-6-...",
     items=first_items,
-    remote_context=RemoteContextHint(store=True),
+    remote_context=RemoteContextHint(enable_cache=True),
 )
 
 history = [*first_items, *first.output_items]
@@ -304,16 +304,13 @@ second = client.generate(
     model="doubao-seed-1-6-...",
     items=items,
     remote_context=RemoteContextHint(
-        previous_response_id=first.id,
-        covered_item_count=len(history),
-    ),
-    replay_policy=ReplayPolicy(
-        on_remote_context_invalid="replay_without_remote_context",
+        enable_cache=True,
+        new_items_start_index=len(history),
     ),
 )
 ```
 
-用户仍传完整 `items`。当 `previous_response_id` 与 `covered_item_count` 同时存在时，adapter 会向 Ark Responses API 发送未覆盖的 suffix。只有显式启用 `replay_without_remote_context` 时，previous response 失效才会自动用完整 `items` 重试一次。
+用户仍传完整 `items`。当 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，adapter 会向 Ark Responses API 发送未覆盖的 suffix。previous response 失效时，adapter 会自动移除失效 id 并用完整 `items` refresh 一次。
 
 ## 当前限制
 

@@ -28,6 +28,7 @@ from whero.vatbrain.core.items import (
     Role,
     TextPart,
     VideoPart,
+    provider_response_id_for,
     provider_snapshot_for,
 )
 from whero.vatbrain.core.tools import FunctionToolSpec, FunctionToolType, ToolChoice, ToolSpec
@@ -35,6 +36,7 @@ from whero.vatbrain.core.usage import Usage
 
 PROVIDER = "volcengine"
 API_FAMILY = "responses"
+_REMOTE_CONTEXT_RESERVED_OPTIONS = {"previous_response_id", "store"}
 
 _RESPONSE_CREATE_SDK_PARAMS = {
     "input",
@@ -72,7 +74,16 @@ def to_volcengine_generation_params(
 ) -> dict[str, Any]:
     """Convert a vatbrain generation request into Ark Responses API parameters."""
 
-    input_items = _volcengine_input_items(request, use_remote_context=use_remote_context)
+    _reject_remote_context_reserved_options(request.provider_options, owner="GenerationRequest.provider_options")
+    if request.remote_context is not None:
+        _reject_remote_context_reserved_options(
+            request.remote_context.provider_options,
+            owner="RemoteContextHint.provider_options",
+        )
+    input_items, previous_response_id = _volcengine_input_items(
+        request,
+        use_remote_context=use_remote_context,
+    )
     params: dict[str, Any] = {
         "model": request.model,
         "input": [_item_to_volcengine_input(item, request.replay_policy) for item in input_items],
@@ -99,10 +110,9 @@ def to_volcengine_generation_params(
             request.remote_context.provider_options,
             sdk_params=_RESPONSE_CREATE_SDK_PARAMS,
         )
-        if use_remote_context and request.remote_context.previous_response_id is not None:
-            params["previous_response_id"] = request.remote_context.previous_response_id
-        if request.remote_context.store is not None:
-            params["store"] = request.remote_context.store
+        if previous_response_id is not None:
+            params["previous_response_id"] = previous_response_id
+        params["store"] = request.remote_context.enable_cache
     if request.tool_call_config:
         params.update(_tool_call_config_to_params(request.tool_call_config))
     _merge_sdk_provider_options(
@@ -118,11 +128,12 @@ def to_volcengine_generation_params(
 def from_volcengine_generation_response(response: Any) -> GenerationResponse:
     """Convert an Ark Responses API response into a vatbrain response."""
 
+    response_id = _get_attr(response, "id", None)
     output_items: list[Item] = []
     unsupported_output_items: list[dict[str, Any]] = []
     for item in _get_attr(response, "output", []) or []:
         try:
-            output_items.append(_volcengine_output_item_to_item(item))
+            output_items.append(_volcengine_output_item_to_item(item, response_id=response_id))
         except ProviderResponseMappingError:
             unsupported_output_items.append(_unsupported_output_item_summary(item))
     if unsupported_output_items and not output_items:
@@ -136,7 +147,7 @@ def from_volcengine_generation_response(response: Any) -> GenerationResponse:
     if unsupported_output_items:
         metadata["unsupported_output_items"] = unsupported_output_items
     return GenerationResponse(
-        id=_get_attr(response, "id", None),
+        id=response_id,
         provider=PROVIDER,
         model=_get_attr(response, "model", None),
         output_items=tuple(output_items),
@@ -177,25 +188,30 @@ def usage_from_volcengine(usage: Any | None) -> Usage | None:
     )
 
 
-def _volcengine_input_items(request: GenerationRequest, *, use_remote_context: bool) -> tuple[Item, ...]:
+def _volcengine_input_items(
+    request: GenerationRequest,
+    *,
+    use_remote_context: bool,
+) -> tuple[tuple[Item, ...], str | None]:
     if not use_remote_context or request.remote_context is None:
-        return request.items
+        return request.items, None
     remote_context = request.remote_context
-    if remote_context.previous_response_id is None:
-        return request.items
-    if remote_context.covered_item_count is None:
-        raise InvalidItemError(
-            "Volcengine previous_response_id replay requires "
-            "RemoteContextHint.covered_item_count."
-        )
-    if remote_context.covered_item_count > len(request.items):
-        raise InvalidItemError(
-            "RemoteContextHint.covered_item_count exceeds GenerationRequest.items length."
-        )
-    suffix = request.items[remote_context.covered_item_count :]
+    if not remote_context.enable_cache or remote_context.new_items_start_index is None:
+        return request.items, None
+    if remote_context.new_items_start_index == 0:
+        return request.items, None
+    anchor_item = request.items[remote_context.new_items_start_index - 1]
+    previous_response_id = provider_response_id_for(
+        anchor_item,
+        provider=PROVIDER,
+        api_family=API_FAMILY,
+    )
+    if previous_response_id is None:
+        return request.items, None
+    suffix = request.items[remote_context.new_items_start_index :]
     if not suffix:
-        raise InvalidItemError("Volcengine previous_response_id replay requires at least one new item.")
-    return suffix
+        raise InvalidItemError("Volcengine response cache delta requires at least one new item.")
+    return suffix, previous_response_id
 
 
 def _item_to_volcengine_input(item: Item, replay_policy: ReplayPolicy | None = None) -> dict[str, Any]:
@@ -374,11 +390,21 @@ def _tool_call_config_to_params(config: ToolCallConfig) -> dict[str, Any]:
     return params
 
 
-def _volcengine_output_item_to_item(item: Any) -> Item:
+def _reject_remote_context_reserved_options(options: Mapping[str, Any], *, owner: str) -> None:
+    reserved = sorted(_REMOTE_CONTEXT_RESERVED_OPTIONS.intersection(options))
+    if reserved:
+        names = ", ".join(reserved)
+        raise UnsupportedCapabilityError(
+            f"{owner} cannot set {names}; use RemoteContextHint.enable_cache and "
+            "RemoteContextHint.new_items_start_index."
+        )
+
+
+def _volcengine_output_item_to_item(item: Any, *, response_id: str | None) -> Item:
     item_type = _get_attr(item, "type", None)
     try:
         if item_type == "message":
-            return _volcengine_message_to_item(item)
+            return _volcengine_message_to_item(item, response_id=response_id)
         if item_type == "function_call":
             return FunctionCallItem(
                 id=_get_attr(item, "id", None),
@@ -386,17 +412,17 @@ def _volcengine_output_item_to_item(item: Any) -> Item:
                 arguments=_get_attr(item, "arguments", ""),
                 call_id=_get_attr(item, "call_id", ""),
                 status=_get_attr(item, "status", None),
-                provider_snapshots=(_provider_snapshot(item, replayable=True),),
+                provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
             )
         if item_type == "function_call_output":
             return FunctionResultItem(
                 id=_get_attr(item, "id", None),
                 call_id=_get_attr(item, "call_id", ""),
                 output=_get_attr(item, "output", ""),
-                provider_snapshots=(_provider_snapshot(item, replayable=True),),
+                provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
             )
         if item_type == "reasoning":
-            return _volcengine_reasoning_to_item(item)
+            return _volcengine_reasoning_to_item(item, response_id=response_id)
     except Exception as exc:
         raise ProviderResponseMappingError(
             f"Malformed Volcengine output item: {item_type!r}",
@@ -413,7 +439,7 @@ def _volcengine_output_item_to_item(item: Any) -> Item:
     )
 
 
-def _volcengine_message_to_item(item: Any) -> MessageItem:
+def _volcengine_message_to_item(item: Any, *, response_id: str | None) -> MessageItem:
     parts: list[TextPart] = []
     content = _get_attr(item, "content", []) or []
     if isinstance(content, str):
@@ -429,11 +455,11 @@ def _volcengine_message_to_item(item: Any) -> MessageItem:
         Role(_get_attr(item, "role", Role.ASSISTANT.value)),
         parts,
         id=_get_attr(item, "id", None),
-        provider_snapshots=(_provider_snapshot(item, replayable=True),),
+        provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
     )
 
 
-def _volcengine_reasoning_to_item(item: Any) -> ReasoningItem:
+def _volcengine_reasoning_to_item(item: Any, *, response_id: str | None) -> ReasoningItem:
     summaries = []
     for summary in _get_attr(item, "summary", []) or []:
         text = _get_attr(summary, "text", None)
@@ -448,7 +474,7 @@ def _volcengine_reasoning_to_item(item: Any) -> ReasoningItem:
         id=_get_attr(item, "id", None),
         status=_get_attr(item, "status", None),
         raw=item,
-        provider_snapshots=(_provider_snapshot(item, replayable=True),),
+        provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
     )
 
 
@@ -485,9 +511,15 @@ def _data_url(data: str | None, mime_type: str) -> str | None:
     return f"data:{mime_type};base64,{data}"
 
 
-def _provider_snapshot(item: Any, *, replayable: bool) -> ProviderItemSnapshot:
+def _provider_snapshot(
+    item: Any,
+    *,
+    replayable: bool,
+    response_id: str | None = None,
+) -> ProviderItemSnapshot:
     payload = _to_plain_data(item)
     item_type = str(_get_attr(item, "type", payload.get("type", "")))
+    metadata = {"response_id": response_id} if response_id else {}
     return ProviderItemSnapshot(
         provider=PROVIDER,
         api_family=API_FAMILY,
@@ -495,6 +527,7 @@ def _provider_snapshot(item: Any, *, replayable: bool) -> ProviderItemSnapshot:
         payload=payload,
         replayable=replayable,
         captured_from="response",
+        metadata=metadata,
     )
 
 

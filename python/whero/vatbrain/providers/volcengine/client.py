@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Iterator, Mapping
+from dataclasses import dataclass, replace
 import time
 from typing import Any
 
@@ -24,7 +25,6 @@ from whero.vatbrain.core.generation import (
     GenerationStreamEvent,
     ReasoningConfig,
     RemoteContextHint,
-    RemoteContextInvalidBehavior,
     ReplayPolicy,
     ResponseFormat,
     StreamOptions,
@@ -74,6 +74,12 @@ from whero.vatbrain.providers.volcengine.mapper import (
 )
 from whero.vatbrain.providers.volcengine.stream import from_volcengine_stream_event
 from whero.vatbrain.structured import ParsedGenerationResponse, pydantic_output
+
+
+@dataclass(frozen=True, slots=True)
+class _GenerationCreateResult:
+    response: Any
+    metadata: dict[str, Any]
 
 
 class VolcengineClient:
@@ -140,11 +146,14 @@ class VolcengineClient:
             replay_policy=replay_policy,
             provider_options=provider_options,
         )
-        response = self._create_generation_response(
+        result = self._create_generation_response(
             request,
             message="Volcengine generation request failed.",
         )
-        return from_volcengine_generation_response(response)
+        return _with_generation_metadata(
+            from_volcengine_generation_response(result.response),
+            result.metadata,
+        )
 
     def generate_parsed(
         self,
@@ -201,11 +210,14 @@ class VolcengineClient:
             replay_policy=replay_policy,
             provider_options=provider_options,
         )
-        response = await self._acreate_generation_response(
+        result = await self._acreate_generation_response(
             request,
             message="Volcengine async generation request failed.",
         )
-        return from_volcengine_generation_response(response)
+        return _with_generation_metadata(
+            from_volcengine_generation_response(result.response),
+            result.metadata,
+        )
 
     async def agenerate_parsed(
         self,
@@ -914,29 +926,62 @@ class VolcengineClient:
             merged_overrides.update(dict(overrides))
         return get_model_capability(model, overrides=merged_overrides or None)
 
-    def _create_generation_response(self, request: GenerationRequest, *, message: str) -> Any:
+    def _create_generation_response(self, request: GenerationRequest, *, message: str) -> _GenerationCreateResult:
         params = to_volcengine_generation_params(request)
         try:
-            return self._sync_client.responses.create(**params)
+            response = self._sync_client.responses.create(**params)
+            return _generation_create_result(
+                response,
+                request=request,
+                initial_params=params,
+                final_params=params,
+                refreshed_after_invalid_context=False,
+            )
         except Exception as exc:
-            if not _should_replay_without_remote_context(request, exc):
+            if not _should_refresh_remote_context(params, exc):
                 raise _provider_request_error(message, "responses.create", exc) from exc
             retry_params = to_volcengine_generation_params(request, use_remote_context=False)
             try:
-                return self._sync_client.responses.create(**retry_params)
+                response = self._sync_client.responses.create(**retry_params)
+                return _generation_create_result(
+                    response,
+                    request=request,
+                    initial_params=params,
+                    final_params=retry_params,
+                    refreshed_after_invalid_context=True,
+                )
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
 
-    async def _acreate_generation_response(self, request: GenerationRequest, *, message: str) -> Any:
+    async def _acreate_generation_response(
+        self,
+        request: GenerationRequest,
+        *,
+        message: str,
+    ) -> _GenerationCreateResult:
         params = to_volcengine_generation_params(request)
         try:
-            return await self._async_ark_client.responses.create(**params)
+            response = await self._async_ark_client.responses.create(**params)
+            return _generation_create_result(
+                response,
+                request=request,
+                initial_params=params,
+                final_params=params,
+                refreshed_after_invalid_context=False,
+            )
         except Exception as exc:
-            if not _should_replay_without_remote_context(request, exc):
+            if not _should_refresh_remote_context(params, exc):
                 raise _provider_request_error(message, "responses.create", exc) from exc
             retry_params = to_volcengine_generation_params(request, use_remote_context=False)
             try:
-                return await self._async_ark_client.responses.create(**retry_params)
+                response = await self._async_ark_client.responses.create(**retry_params)
+                return _generation_create_result(
+                    response,
+                    request=request,
+                    initial_params=params,
+                    final_params=retry_params,
+                    refreshed_after_invalid_context=True,
+                )
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
 
@@ -945,7 +990,7 @@ class VolcengineClient:
         try:
             return self._sync_client.responses.create(**params)
         except Exception as exc:
-            if not _should_replay_without_remote_context(request, exc):
+            if not _should_refresh_remote_context(params, exc):
                 raise _provider_request_error(message, "responses.create", exc) from exc
             retry_params = to_volcengine_generation_params(request, stream=True, use_remote_context=False)
             try:
@@ -958,7 +1003,7 @@ class VolcengineClient:
         try:
             return await self._async_ark_client.responses.create(**params)
         except Exception as exc:
-            if not _should_replay_without_remote_context(request, exc):
+            if not _should_refresh_remote_context(params, exc):
                 raise _provider_request_error(message, "responses.create", exc) from exc
             retry_params = to_volcengine_generation_params(request, stream=True, use_remote_context=False)
             try:
@@ -1084,12 +1129,59 @@ def _provider_request_error(message: str, operation: str, exc: BaseException) ->
     )
 
 
-def _should_replay_without_remote_context(request: GenerationRequest, exc: BaseException) -> bool:
-    if request.remote_context is None or request.remote_context.previous_response_id is None:
-        return False
-    if request.replay_policy is None:
-        return False
-    if request.replay_policy.on_remote_context_invalid != RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT:
+def _generation_create_result(
+    response: Any,
+    *,
+    request: GenerationRequest,
+    initial_params: Mapping[str, Any],
+    final_params: Mapping[str, Any],
+    refreshed_after_invalid_context: bool,
+) -> _GenerationCreateResult:
+    return _GenerationCreateResult(
+        response=response,
+        metadata=_response_style_remote_context_metadata(
+            request=request,
+            initial_params=initial_params,
+            final_params=final_params,
+            refreshed_after_invalid_context=refreshed_after_invalid_context,
+        ),
+    )
+
+
+def _response_style_remote_context_metadata(
+    *,
+    request: GenerationRequest,
+    initial_params: Mapping[str, Any],
+    final_params: Mapping[str, Any],
+    refreshed_after_invalid_context: bool,
+) -> dict[str, Any]:
+    if request.remote_context is None:
+        return {}
+    metadata: dict[str, Any] = {
+        "api_family": "responses",
+        "cache_enabled": request.remote_context.enable_cache,
+        "attempted_previous_response_id": bool(initial_params.get("previous_response_id")),
+        "final_request_used_previous_response_id": bool(final_params.get("previous_response_id")),
+        "refreshed_after_invalid_context": refreshed_after_invalid_context,
+    }
+    if request.remote_context.new_items_start_index is not None:
+        metadata["new_items_start_index"] = request.remote_context.new_items_start_index
+    return {"remote_context": metadata}
+
+
+def _with_generation_metadata(
+    response: GenerationResponse,
+    metadata: Mapping[str, Any],
+) -> GenerationResponse:
+    if not metadata:
+        return response
+    merged = dict(response.metadata)
+    merged.update(dict(metadata))
+    return replace(response, metadata=merged)
+
+
+def _should_refresh_remote_context(params: Mapping[str, Any], exc: BaseException) -> bool:
+    if not params.get("previous_response_id"):
         return False
     return _is_remote_context_invalid_error(exc)
 

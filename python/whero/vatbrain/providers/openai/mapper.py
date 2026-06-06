@@ -34,6 +34,7 @@ from whero.vatbrain.core.items import (
     ProviderItemSnapshot,
     Role,
     TextPart,
+    provider_response_id_for,
     provider_snapshot_for,
 )
 from whero.vatbrain.core.tools import FunctionToolSpec, FunctionToolType, ToolChoice, ToolSpec
@@ -41,6 +42,7 @@ from whero.vatbrain.core.usage import Usage
 
 PROVIDER = "openai"
 API_FAMILY = "responses"
+_REMOTE_CONTEXT_RESERVED_OPTIONS = {"previous_response_id", "store"}
 
 
 def to_openai_generation_params(
@@ -51,7 +53,16 @@ def to_openai_generation_params(
 ) -> dict[str, Any]:
     """Convert a vatbrain generation request into OpenAI Responses API parameters."""
 
-    input_items = _openai_input_items(request, use_remote_context=use_remote_context)
+    _reject_remote_context_reserved_options(request.provider_options, owner="GenerationRequest.provider_options")
+    if request.remote_context is not None:
+        _reject_remote_context_reserved_options(
+            request.remote_context.provider_options,
+            owner="RemoteContextHint.provider_options",
+        )
+    input_items, previous_response_id = _openai_input_items(
+        request,
+        use_remote_context=use_remote_context,
+    )
     params: dict[str, Any] = {
         "model": request.model,
         "input": [_item_to_openai_input(item, request.replay_policy) for item in input_items],
@@ -72,7 +83,7 @@ def to_openai_generation_params(
         params.update(
             _remote_context_to_openai(
                 request.remote_context,
-                include_previous_response_id=use_remote_context,
+                previous_response_id=previous_response_id,
             )
         )
     if request.tool_call_config:
@@ -105,11 +116,12 @@ def to_openai_embedding_params(request: EmbeddingRequest) -> dict[str, Any]:
 def from_openai_generation_response(response: Any) -> GenerationResponse:
     """Convert an OpenAI Responses API response into a vatbrain response."""
 
+    response_id = _get_attr(response, "id", None)
     output_items: list[Item] = []
     unsupported_output_items: list[dict[str, Any]] = []
     for item in _get_attr(response, "output", []) or []:
         try:
-            output_items.append(_openai_output_item_to_item(item))
+            output_items.append(_openai_output_item_to_item(item, response_id=response_id))
         except ProviderResponseMappingError:
             unsupported_output_items.append(_unsupported_output_item_summary(item))
     if unsupported_output_items and not output_items:
@@ -123,7 +135,7 @@ def from_openai_generation_response(response: Any) -> GenerationResponse:
     if unsupported_output_items:
         metadata["unsupported_output_items"] = unsupported_output_items
     return GenerationResponse(
-        id=_get_attr(response, "id", None),
+        id=response_id,
         provider=PROVIDER,
         model=_get_attr(response, "model", None),
         output_items=tuple(output_items),
@@ -180,25 +192,30 @@ def usage_from_openai(usage: Any | None) -> Usage | None:
     )
 
 
-def _openai_input_items(request: GenerationRequest, *, use_remote_context: bool) -> tuple[Item, ...]:
+def _openai_input_items(
+    request: GenerationRequest,
+    *,
+    use_remote_context: bool,
+) -> tuple[tuple[Item, ...], str | None]:
     if not use_remote_context or request.remote_context is None:
-        return request.items
+        return request.items, None
     remote_context = request.remote_context
-    if remote_context.previous_response_id is None:
-        return request.items
-    if remote_context.covered_item_count is None:
-        raise InvalidItemError(
-            "OpenAI previous_response_id replay requires "
-            "RemoteContextHint.covered_item_count."
-        )
-    if remote_context.covered_item_count > len(request.items):
-        raise InvalidItemError(
-            "RemoteContextHint.covered_item_count exceeds GenerationRequest.items length."
-        )
-    suffix = request.items[remote_context.covered_item_count :]
+    if not remote_context.enable_cache or remote_context.new_items_start_index is None:
+        return request.items, None
+    if remote_context.new_items_start_index == 0:
+        return request.items, None
+    anchor_item = request.items[remote_context.new_items_start_index - 1]
+    previous_response_id = provider_response_id_for(
+        anchor_item,
+        provider=PROVIDER,
+        api_family=API_FAMILY,
+    )
+    if previous_response_id is None:
+        return request.items, None
+    suffix = request.items[remote_context.new_items_start_index :]
     if not suffix:
-        raise InvalidItemError("OpenAI previous_response_id replay requires at least one new item.")
-    return suffix
+        raise InvalidItemError("OpenAI response cache delta requires at least one new item.")
+    return suffix, previous_response_id
 
 
 def _item_to_openai_input(item: Item, replay_policy: ReplayPolicy | None = None) -> dict[str, Any]:
@@ -335,14 +352,23 @@ def _reasoning_to_openai(reasoning: ReasoningConfig) -> dict[str, Any]:
 def _remote_context_to_openai(
     remote_context: RemoteContextHint,
     *,
-    include_previous_response_id: bool = True,
+    previous_response_id: str | None = None,
 ) -> dict[str, Any]:
     params = dict(remote_context.provider_options)
-    if include_previous_response_id and remote_context.previous_response_id is not None:
-        params["previous_response_id"] = remote_context.previous_response_id
-    if remote_context.store is not None:
-        params["store"] = remote_context.store
+    if previous_response_id is not None:
+        params["previous_response_id"] = previous_response_id
+    params["store"] = remote_context.enable_cache
     return params
+
+
+def _reject_remote_context_reserved_options(options: Mapping[str, Any], *, owner: str) -> None:
+    reserved = sorted(_REMOTE_CONTEXT_RESERVED_OPTIONS.intersection(options))
+    if reserved:
+        names = ", ".join(reserved)
+        raise UnsupportedCapabilityError(
+            f"{owner} cannot set {names}; use RemoteContextHint.enable_cache and "
+            "RemoteContextHint.new_items_start_index."
+        )
 
 
 def _tool_call_config_to_params(config: ToolCallConfig) -> dict[str, Any]:
@@ -358,11 +384,11 @@ def _tool_call_config_to_params(config: ToolCallConfig) -> dict[str, Any]:
     return params
 
 
-def _openai_output_item_to_item(item: Any) -> Item:
+def _openai_output_item_to_item(item: Any, *, response_id: str | None) -> Item:
     item_type = _get_attr(item, "type", None)
     try:
         if item_type == "message":
-            return _openai_message_to_item(item)
+            return _openai_message_to_item(item, response_id=response_id)
         if item_type == "function_call":
             return FunctionCallItem(
                 id=_get_attr(item, "id", None),
@@ -370,7 +396,7 @@ def _openai_output_item_to_item(item: Any) -> Item:
                 arguments=_get_attr(item, "arguments", ""),
                 call_id=_get_attr(item, "call_id", ""),
                 status=_get_attr(item, "status", None),
-                provider_snapshots=(_provider_snapshot(item, replayable=True),),
+                provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
             )
         if item_type == "custom_tool_call":
             input_text = _get_attr(item, "input", "")
@@ -382,7 +408,7 @@ def _openai_output_item_to_item(item: Any) -> Item:
                 status=_get_attr(item, "status", None),
                 type=FunctionToolType.CUSTOM,
                 input=input_text,
-                provider_snapshots=(_provider_snapshot(item, replayable=True),),
+                provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
             )
     except Exception as exc:
         raise ProviderResponseMappingError(
@@ -400,7 +426,7 @@ def _openai_output_item_to_item(item: Any) -> Item:
     )
 
 
-def _openai_message_to_item(item: Any) -> MessageItem:
+def _openai_message_to_item(item: Any, *, response_id: str | None) -> MessageItem:
     parts: list[TextPart] = []
     for content_item in _get_attr(item, "content", []) or []:
         content_type = _get_attr(content_item, "type", None)
@@ -413,7 +439,7 @@ def _openai_message_to_item(item: Any) -> MessageItem:
         parts,
         assistant_phase=_get_attr(item, "phase", None),
         id=_get_attr(item, "id", None),
-        provider_snapshots=(_provider_snapshot(item, replayable=True),),
+        provider_snapshots=(_provider_snapshot(item, replayable=True, response_id=response_id),),
     )
 
 
@@ -460,9 +486,15 @@ def _get_attr(obj: Any, name: str, default: Any = None) -> Any:
     return getattr(obj, name, default)
 
 
-def _provider_snapshot(item: Any, *, replayable: bool) -> ProviderItemSnapshot:
+def _provider_snapshot(
+    item: Any,
+    *,
+    replayable: bool,
+    response_id: str | None = None,
+) -> ProviderItemSnapshot:
     payload = _to_plain_data(item)
     item_type = str(_get_attr(item, "type", payload.get("type", "")))
+    metadata = {"response_id": response_id} if response_id else {}
     return ProviderItemSnapshot(
         provider=PROVIDER,
         api_family=API_FAMILY,
@@ -470,6 +502,7 @@ def _provider_snapshot(item: Any, *, replayable: bool) -> ProviderItemSnapshot:
         payload=payload,
         replayable=replayable,
         captured_from="response",
+        metadata=metadata,
     )
 
 

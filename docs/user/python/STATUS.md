@@ -35,7 +35,7 @@
   - 多模态 embedding、instructions、dense/sparse vector。
   - Ark Images API 图片生成、参考图生成与图片流式生成。
   - Ark Content Generation 视频任务创建、查询与轮询。
-  - provider-native replay 与 previous response 差分传输。
+  - provider-native replay、snapshot response id 与 previous response 差分传输。
   - capability 查询。
 - Anthropic provider client：
   - `whero-vatbrain[anthropic]` optional dependency。
@@ -44,8 +44,8 @@
   - 同步/异步 generation 与 streaming。
   - text/image input。
   - user-executed function tools。
-  - `RemoteContextHint.store=True` 映射为 automatic prefix caching。
-  - `previous_response_id` 与 `covered_item_count` 兼容接收但忽略，不做差分传输。
+  - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
+  - `new_items_start_index` 兼容接收但忽略，不做差分传输。
   - usage cache token 映射。
   - capability 查询。
 - Generation：
@@ -54,9 +54,9 @@
   - `ReasoningConfig`。
   - `ToolCallConfig`。
   - `ResponseFormat` JSON Schema structured output。
-  - `RemoteContextHint` 与 `covered_item_count`。
+  - `RemoteContextHint.enable_cache` 与 `new_items_start_index`。
   - `ReplayPolicy`、provider snapshot、OpenAI `phase` 与 `AssistantMessagePhase`。
-  - response id 失效后的显式 fallback。
+  - response id 失效后的自动 full-context refresh。
 - Streaming：
   - 标准化 event。
   - `raw_event`。

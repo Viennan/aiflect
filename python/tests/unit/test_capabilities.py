@@ -77,7 +77,7 @@ def test_anthropic_adapter_capability_declares_generation_only_surface() -> None
     assert capability.generation is not None
     assert capability.generation.input_modalities.value == ("text", "image")
     assert capability.generation.remote_context.value is True
-    assert capability.generation.metadata["remote_context_semantics"].startswith("store maps")
+    assert capability.generation.metadata["remote_context_semantics"].startswith("enable_cache maps")
     assert capability.tools is not None
     assert capability.tools.user_function_tools.value is True
     assert capability.tools.custom_tools.value is False

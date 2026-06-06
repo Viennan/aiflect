@@ -11,11 +11,13 @@ from whero.vatbrain import (
     GenerationConfig,
     GenerationRequest,
     MessageItem,
+    ProviderItemSnapshot,
     ReasoningConfig,
     RemoteContextHint,
     ReplayMode,
     ReplayPolicy,
     ResponseFormat,
+    Role,
     StreamOptions,
     TextPart,
     ToolCallConfig,
@@ -29,6 +31,26 @@ from whero.vatbrain.providers.openai.mapper import (
     from_openai_generation_response,
     to_openai_generation_params,
 )
+
+
+def _openai_anchor(response_id: str = "resp_1") -> MessageItem:
+    return MessageItem(
+        Role.ASSISTANT,
+        "covered",
+        provider_snapshots=[
+            ProviderItemSnapshot(
+                provider="openai",
+                api_family="responses",
+                item_type="message",
+                payload={
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "covered"}],
+                },
+                metadata={"response_id": response_id},
+            )
+        ],
+    )
 
 
 def test_generation_request_maps_common_reasoning_and_tool_config() -> None:
@@ -148,11 +170,10 @@ def test_assistant_phase_maps_to_openai_message_phase() -> None:
 def test_generation_request_maps_remote_context_hint() -> None:
     request = GenerationRequest(
         model="gpt-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
+        items=[_openai_anchor(), MessageItem.user("hello")],
         remote_context=RemoteContextHint(
-            previous_response_id="resp_1",
-            covered_item_count=1,
-            store=True,
+            enable_cache=True,
+            new_items_start_index=1,
             provider_options={"prompt_cache_key": "cache-key"},
         ),
     )
@@ -166,22 +187,25 @@ def test_generation_request_maps_remote_context_hint() -> None:
     assert params["prompt_cache_key"] == "cache-key"
 
 
-def test_openai_generation_mapper_requires_remote_context_coverage() -> None:
+def test_openai_generation_mapper_uses_full_input_without_anchor_response_id() -> None:
     request = GenerationRequest(
         model="gpt-test",
-        items=[MessageItem.user("hello")],
-        remote_context=RemoteContextHint(previous_response_id="resp_1"),
+        items=[MessageItem.assistant("covered"), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
-    with pytest.raises(InvalidItemError, match="covered_item_count"):
-        to_openai_generation_params(request)
+    params = to_openai_generation_params(request)
+
+    assert "previous_response_id" not in params
+    assert params["store"] is True
+    assert len(params["input"]) == 2
 
 
 def test_openai_generation_mapper_rejects_empty_remote_context_suffix() -> None:
     request = GenerationRequest(
         model="gpt-test",
-        items=[MessageItem.user("covered")],
-        remote_context=RemoteContextHint(previous_response_id="resp_1", covered_item_count=1),
+        items=[_openai_anchor()],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     with pytest.raises(InvalidItemError, match="at least one new item"):
@@ -191,11 +215,10 @@ def test_openai_generation_mapper_rejects_empty_remote_context_suffix() -> None:
 def test_openai_generation_mapper_can_build_full_input_without_remote_context() -> None:
     request = GenerationRequest(
         model="gpt-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
+        items=[_openai_anchor(), MessageItem.user("hello")],
         remote_context=RemoteContextHint(
-            previous_response_id="resp_1",
-            covered_item_count=1,
-            store=True,
+            enable_cache=True,
+            new_items_start_index=1,
         ),
     )
 
@@ -204,7 +227,7 @@ def test_openai_generation_mapper_can_build_full_input_without_remote_context() 
     assert "previous_response_id" not in params
     assert params["store"] is True
     assert len(params["input"]) == 2
-    assert params["input"][0]["role"] == "system"
+    assert params["input"][0]["role"] == "assistant"
     assert params["input"][1]["role"] == "user"
 
 
@@ -348,11 +371,13 @@ def test_openai_response_maps_message_function_call_and_usage() -> None:
     assert mapped.output_items[0].assistant_phase == AssistantMessagePhase.FINAL_ANSWER
     assert mapped.output_items[0].parts == (TextPart("hello there"),)
     assert mapped.output_items[0].provider_snapshots[0].payload["phase"] == "final_answer"
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert isinstance(mapped.output_items[1], FunctionCallItem)
     assert mapped.output_items[1].name == "lookup"
     assert mapped.output_items[1].call_id == "call_1"
     assert mapped.output_items[1].type == FunctionToolType.FUNCTION
     assert mapped.output_items[1].provider_snapshots[0].payload["type"] == "function_call"
+    assert mapped.output_items[1].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert mapped.usage is not None
     assert mapped.usage.input_tokens == 10
     assert mapped.usage.output_tokens == 5
@@ -386,6 +411,7 @@ def test_openai_response_maps_custom_tool_call() -> None:
     assert mapped.output_items[0].input == "print('hello')"
     assert mapped.output_items[0].arguments == "print('hello')"
     assert mapped.output_items[0].provider_snapshots[0].payload["type"] == "custom_tool_call"
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_id"] == "resp_1"
 
 
 def test_openai_generation_mapper_maps_custom_tool_call_input() -> None:

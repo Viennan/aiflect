@@ -106,9 +106,8 @@ def test_anthropic_client_generate_uses_messages_create_and_cache_hint() -> None
         items=[MessageItem.system("policy"), MessageItem.user("hello")],
         generation_config=GenerationConfig(max_output_tokens=64),
         remote_context=RemoteContextHint(
-            previous_response_id="ignored",
-            covered_item_count=1,
-            store=True,
+            enable_cache=True,
+            new_items_start_index=1,
         ),
     )
 

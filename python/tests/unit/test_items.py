@@ -17,6 +17,7 @@ from whero.vatbrain import (
     Role,
     TextPart,
     VideoPart,
+    provider_response_id_for,
     provider_snapshot_for,
 )
 
@@ -50,6 +51,20 @@ def test_provider_item_snapshot_attaches_to_item_field() -> None:
     assert item.provider_snapshots == (snapshot,)
     assert provider_snapshot_for(item, provider="openai", api_family="responses") is snapshot
     assert provider_snapshot_for(item, provider="volcengine", api_family="responses") is None
+
+
+def test_provider_response_id_reads_snapshot_metadata() -> None:
+    snapshot = ProviderItemSnapshot(
+        provider="openai",
+        api_family="responses",
+        item_type="message",
+        payload={"type": "message", "role": "assistant", "content": []},
+        metadata={"response_id": "resp_1"},
+    )
+    item = MessageItem(Role.ASSISTANT, "hello", provider_snapshots=[snapshot])
+
+    assert provider_response_id_for(item, provider="openai", api_family="responses") == "resp_1"
+    assert provider_response_id_for(item, provider="anthropic", api_family="messages") is None
 
 
 def test_image_part_requires_exactly_one_source() -> None:

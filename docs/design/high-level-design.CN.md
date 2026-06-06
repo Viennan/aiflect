@@ -57,11 +57,11 @@
 
 provider 侧的 stored response、previous response、conversation、context cache 或其他上下文状态能力应被视为优化提示，而不是 `vatbrain` 的核心语义状态。
 
-`vatbrain` 可以允许用户显式传入远端上下文 hint，例如 previous response id 或 store policy。adapter 可以利用这些 hint 降低成本或延迟，但调用语义仍应由用户传入的完整 `Item` 序列定义。provider conversation 这类持久化上下文暂不进入通用 core 抽象。v0.3 暂不在通用 core 中表达 prompt/cache retention 与远端过期时间；这些 provider-specific 能力应通过 `provider_options` 透传。
+`vatbrain` 允许用户通过 `RemoteContextHint` 表达是否启用 provider-side cache，以及完整 `items` 中新增 item 的起始位置。用户不直接管理 provider response id；response-style adapter 会从历史 item 的 provider snapshot metadata 中查找 response id，并按 provider 语义决定是否发送 suffix。调用语义仍由用户传入的完整 `Item` 序列定义。provider conversation 这类持久化上下文暂不进入通用 core 抽象，prompt/cache retention 与远端过期时间仍通过 provider-specific 能力处理。
 
-Full-context First 不等于每次 provider 请求都必须传输完整 input。若用户明确说明某个 `previous_response_id` 已覆盖完整 `items` 的前缀，adapter 可以只把未覆盖的追加 suffix 发送给 provider。该覆盖边界必须显式表达，例如通过 `RemoteContextHint.covered_item_count`；adapter 不能只凭 `previous_response_id` 猜测哪些 item 是 history、哪些 item 是新增输入。
+Full-context First 不等于每次 provider 请求都必须传输完整 input。若用户明确提供 `RemoteContextHint.new_items_start_index`，response-style adapter 可以在边界前一个 item 中找到 response id 时只发送新增 suffix；若找不到 response id，则退化为完整 input。adapter 不能只凭 role、purpose 或 provider item id 猜测哪些 item 是 history、哪些 item 是新增输入。
 
-当远端上下文 hint 失效时，adapter 不应默认静默 fallback。若用户显式启用重放策略，adapter 可以基于完整 `Item` 序列重新发起请求。为避免丢失 provider 原生 item 字段，`vatbrain` 应支持 provider-native snapshot 与强制 replay 策略；详见 [provider-native-replay.CN.md](provider-native-replay.CN.md)。
+当 response-style provider 返回明确的 previous response/context 失效错误时，adapter 应移除失效 response id，并基于完整 `Item` 序列自动 refresh 一次。该行为只针对明确的 remote context invalid/expired 错误，不扩大为通用网络或业务错误重试。为避免丢失 provider 原生 item 字段，`vatbrain` 支持 provider-native snapshot 与强制 replay 策略；详见 [provider-native-replay.CN.md](provider-native-replay.CN.md)。
 
 ### API-family Separation
 
@@ -143,7 +143,7 @@ generation 请求还应包含若干通用行为配置。凡是表达“用户希
 
 不同 provider/model 可以只支持其中一部分字段。adapter 负责将通用语义映射到厂商原生参数；无法映射时应基于 capability 与用户策略进行处理。
 
-provider 侧上下文状态可以通过 generation request 中的远端上下文 hint 表达，但只作为优化提示。即使某个 provider 支持 `previous_response_id` 或缓存，`vatbrain` 的推荐编程模型仍是由用户代码维护完整语义上下文。v0.3 的通用 `RemoteContextHint` 暂不暴露 cache policy 或远端过期时间。
+provider 侧上下文状态可以通过 generation request 中的远端上下文 hint 表达，但只作为优化提示。即使某个 provider 支持 `previous_response_id` 或缓存，`vatbrain` 的推荐编程模型仍是由用户代码维护完整语义上下文。通用 `RemoteContextHint.enable_cache` 只表达是否启用 provider-side cache/stored response，远端过期时间等细节仍不进入通用 core。
 
 ### Embedding
 
@@ -574,13 +574,13 @@ capability 是能力描述和校验辅助，不是自动决策机制。调用前
 
 ### 使用 previous response 时是否仍要把完整 items 全量传给 provider？
 
-不一定。用户侧仍应传入完整 `items`，但 adapter 可以在 provider 请求层做增量传输优化：当 `RemoteContextHint.previous_response_id` 存在，并且用户明确提供 `covered_item_count` 说明该 response id 已覆盖完整 `items` 的前缀时，adapter 可以按 provider 语义只发送未覆盖的追加 suffix。对 OpenAI Responses adapter 来说，存在 `previous_response_id` 时应发送增量 input；若 previous response 失效并且用户启用 fallback，adapter 必须移除失效 hint，并重新发送完整 `items`。
+不一定。用户侧仍应传入完整 `items`，但 adapter 可以在 provider 请求层做增量传输优化：当 `RemoteContextHint(enable_cache=True, new_items_start_index=...)` 存在，且边界前一个 item 的 provider snapshot metadata 中存在匹配 response id 时，response-style adapter 可以发送 `previous_response_id` 和新增 suffix。对 Anthropic Messages adapter 来说，仍发送完整 messages，只把 `enable_cache=True` 映射为 automatic prompt caching。
 
-使用 `previous_response_id` 时，需要保证被引用的上一轮 response 在生成时已被 provider 存储。`RemoteContextHint.store=None` 表示本轮调用不显式指定存储策略，依赖 provider 默认行为；本轮是否设置 `store=True` 只决定本轮 response 是否适合作为未来调用的 `previous_response_id`。
+启用 cache 时，response-style provider 会请求存储本轮 response，并将 parent response id 写入输出 item 的 provider snapshot metadata。下一轮用户只需要保留完整 `items` 并提供新增边界，不需要手工保存或传入 response id。
 
 ### response id 失效后是否应该自动重放？
 
-默认不应自动重放，因为重试可能带来重复计费或重复副作用。用户可以显式启用 replay policy，让 adapter 在明确识别 remote context 失效时移除失效 hint，并基于完整 `Item` 序列重试。需要严格保留 provider 原生 item 信息时，应使用强制 replay；缺少可重放 provider-native snapshot 时必须报错。
+应该在非常窄的条件下自动 refresh：只有当本次请求实际发送了 provider response id，且 provider 返回明确的 previous response/context invalid 或 expired 错误时，adapter 才移除该 id 并用完整 `items` 再请求一次。普通错误、未知错误和已开始输出的 stream 不做隐藏重试。需要严格保留 provider 原生 item 信息时，应使用强制 replay；缺少可重放 provider-native snapshot 时必须报错。
 
 ### 跨 provider replay 是否支持？
 

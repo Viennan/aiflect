@@ -24,8 +24,8 @@ Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthrop
 实现决策：
 
 - `ResponseFormat` 与 `ReasoningConfig` 请求映射暂不支持，遇到即抛 `UnsupportedCapabilityError`。
-- `RemoteContextHint.store=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
-- `previous_response_id` 与 `covered_item_count` 兼容接收但忽略，不做差分传输。
+- `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
+- `new_items_start_index` 兼容接收但忽略，不做差分传输。
 - 用户显式传入 `cache_control` 会被拒绝，避免形成 explicit cache control 隐式入口。
 
 ## 依赖与包结构
@@ -112,7 +112,7 @@ def to_anthropic_generation_params(
     ...
 ```
 
-Anthropic adapter 不需要 `use_remote_context` 参数，因为它不支持 `previous_response_id` 差分传输。
+Anthropic adapter 不需要 `use_remote_context` 参数，因为它不支持 response-style previous response 差分传输。
 
 ### 基本参数
 
@@ -131,21 +131,19 @@ Anthropic Messages API 要求 `max_tokens`。MVP 建议如果 `GenerationConfig.
 
 ### RemoteContextHint 与 Cache
 
-Anthropic mapper 只使用 `RemoteContextHint.store`：
+Anthropic mapper 只使用 `RemoteContextHint.enable_cache`：
 
 ```python
-if request.remote_context and request.remote_context.store is True:
+if request.remote_context and request.remote_context.enable_cache is True:
     params["cache_control"] = {"type": "ephemeral"}
 ```
 
 不映射：
 
-- `previous_response_id`
-- `covered_item_count`
+- `new_items_start_index`
 - `RemoteContextHint.provider_options`
-- `ReplayPolicy.on_remote_context_invalid`
 
-即使存在 `previous_response_id`，也始终使用完整 `request.items` 构造 Anthropic messages。
+即使存在 `new_items_start_index`，也始终使用完整 `request.items` 构造 Anthropic messages。
 
 ### Messages 与 System
 
@@ -381,7 +379,7 @@ reasoning_output=True
 remote_context=True
 function_tools=True
 metadata["remote_context_semantics"] =
-  "store maps to automatic prompt caching; previous_response_id ignored; no transport delta"
+  "enable_cache maps to automatic prompt caching; new_items_start_index ignored; no transport delta"
 ```
 
 Tool capability：
@@ -411,7 +409,7 @@ Anthropic SDK 调用异常映射为 `ProviderRequestError`：
 
 错误 body 解析应沿用 OpenAI/Volcengine helper 风格，兼容 dict 与 SDK error object。
 
-Anthropic 不使用 `previous_response_id`，所以不需要 `_should_replay_without_remote_context` 或 remote context invalid fallback。
+Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_should_refresh_remote_context` 或 remote context refresh。
 
 ## 测试策略
 
@@ -423,8 +421,8 @@ Anthropic 不使用 `previous_response_id`，所以不需要 `_should_replay_wit
   - text message mapping。
   - initial system/developer mapping。
   - image URL/base64 mapping。
-  - `RemoteContextHint(store=True)` maps to top-level `cache_control`。
-  - `previous_response_id` / `covered_item_count` ignored and full messages retained。
+  - `RemoteContextHint(enable_cache=True)` maps to top-level `cache_control`。
+  - `new_items_start_index` ignored and full messages retained。
   - function tool mapping。
   - explicit `cache_control` in request/remote/tool provider options is rejected。
   - function call / function result replay mapping。
@@ -441,7 +439,7 @@ Anthropic 不使用 `previous_response_id`，所以不需要 `_should_replay_wit
   - sync/async client injected fake SDK。
   - credential validation。
   - ProviderRequestError mapping。
-  - no fallback on previous_response_id。
+  - no response-style remote context refresh。
 - `test_capabilities.py`
   - Anthropic adapter capability。
 
@@ -467,11 +465,11 @@ Anthropic 不使用 `previous_response_id`，所以不需要 `_should_replay_wit
 
 ### 为什么 Anthropic mapper 不实现 `use_remote_context=False`？
 
-因为 Anthropic adapter 不使用 `previous_response_id` 进行第一次优化请求，也不存在 remote-context invalid 后的 fallback 请求。它每次都从完整 `items` 构造 full messages。
+因为 Anthropic adapter 不使用 response-style `previous_response_id` 进行第一次优化请求，也不存在 remote-context invalid 后的 refresh 请求。它每次都从完整 `items` 构造 full messages。
 
-### 为什么 `RemoteContextHint.store=True` 能映射为 prompt caching？
+### 为什么 `RemoteContextHint.enable_cache=True` 能映射为 prompt caching？
 
-在 `vatbrain` 的通用语义里，`store` 表达 provider-side state/cache/store 的优化意图。Anthropic 没有 Responses previous response 差分语义，但 automatic prefix caching 正好是 provider-side 前缀复用优化。
+在 `vatbrain` 的通用语义里，`enable_cache` 表达 provider-side state/cache/store 的优化意图。Anthropic 没有 Responses previous response 差分语义，但 automatic prefix caching 正好是 provider-side 前缀复用优化。
 
 ### 为什么不支持 `FunctionToolType.CUSTOM`？
 

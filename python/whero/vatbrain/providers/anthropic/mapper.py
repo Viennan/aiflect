@@ -72,7 +72,7 @@ def to_anthropic_generation_params(
     if request.tool_call_config:
         params.update(_tool_call_config_to_params(request.tool_call_config))
     params.update(request.provider_options)
-    if request.remote_context is not None and request.remote_context.store is True:
+    if request.remote_context is not None and request.remote_context.enable_cache is True:
         params[_CACHE_CONTROL] = {"type": "ephemeral"}
     if params.get("max_tokens") is None:
         raise InvalidItemError(
@@ -463,7 +463,7 @@ def _reject_explicit_cache_control(options: Mapping[str, Any], *, owner: str) ->
     if _CACHE_CONTROL in options:
         raise UnsupportedCapabilityError(
             f"{owner} cannot set Anthropic cache_control explicitly; "
-            "use RemoteContextHint.store=True for automatic prompt caching."
+            "use RemoteContextHint.enable_cache=True for automatic prompt caching."
         )
 
 

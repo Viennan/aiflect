@@ -13,12 +13,14 @@ from whero.vatbrain import (
     GenerationRequest,
     ImagePart,
     MessageItem,
+    ProviderItemSnapshot,
     ReasoningConfig,
     ReasoningItem,
     RemoteContextHint,
     ReplayMode,
     ReplayPolicy,
     ResponseFormat,
+    Role,
     TextPart,
     ToolCallConfig,
     ToolChoice,
@@ -32,11 +34,31 @@ from whero.vatbrain.providers.volcengine.mapper import (
 )
 
 
+def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
+    return MessageItem(
+        Role.ASSISTANT,
+        "covered",
+        provider_snapshots=[
+            ProviderItemSnapshot(
+                provider="volcengine",
+                api_family="responses",
+                item_type="message",
+                payload={
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "covered"}],
+                },
+                metadata={"response_id": response_id},
+            )
+        ],
+    )
+
+
 def test_generation_request_maps_ark_responses_params() -> None:
     request = GenerationRequest(
         model="doubao-test",
         items=[
-            MessageItem.system("covered"),
+            _volcengine_anchor(),
             MessageItem.user(
                 [
                     TextPart("describe"),
@@ -64,9 +86,8 @@ def test_generation_request_maps_ark_responses_params() -> None:
         reasoning=ReasoningConfig(mode="enabled", effort="low"),
         tool_call_config=ToolCallConfig(parallel_tool_calls=True, tool_choice=ToolChoice.AUTO),
         remote_context=RemoteContextHint(
-            previous_response_id="resp_old",
-            covered_item_count=1,
-            store=True,
+            enable_cache=True,
+            new_items_start_index=1,
         ),
     )
 
@@ -138,15 +159,16 @@ def test_generation_request_routes_sdk_unknown_body_fields_to_extra_body() -> No
 def test_generation_mapper_can_replay_without_remote_context() -> None:
     request = GenerationRequest(
         model="doubao-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
-        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
+        items=[_volcengine_anchor(), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     params = to_volcengine_generation_params(request, use_remote_context=False)
 
     assert "previous_response_id" not in params
+    assert params["store"] is True
     assert len(params["input"]) == 2
-    assert params["input"][0]["role"] == "system"
+    assert params["input"][0]["role"] == "assistant"
 
 
 def test_generation_mapper_rejects_custom_tools() -> None:
@@ -262,9 +284,13 @@ def test_generation_response_maps_reasoning_function_call_output_and_snapshots()
     assert isinstance(mapped.output_items[0], ReasoningItem)
     assert mapped.output_items[0].summary == "I checked the premise."
     assert mapped.output_items[0].provider_snapshots[0].payload["type"] == "reasoning"
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_id"] == "resp_1"
+    assert mapped.output_items[1].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert isinstance(mapped.output_items[2], FunctionCallItem)
     assert mapped.output_items[2].name == "lookup"
+    assert mapped.output_items[2].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert isinstance(mapped.output_items[3], FunctionResultItem)
+    assert mapped.output_items[3].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert mapped.usage is not None
     assert mapped.usage.reasoning_tokens == 2
     assert mapped.usage.metadata["tool_usage"] == {"function_calls": 1}

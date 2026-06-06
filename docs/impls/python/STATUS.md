@@ -1,6 +1,6 @@
 # Python 实现状态
 
-状态：v0.6 Anthropic adapter 已完成
+状态：v0.6 Anthropic adapter 与 remote context cache 策略升级已完成
 日期：2026-05-05
 最近更新：2026-06-06
 
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter，在 v0.5 Media Generation 基础上接入官方 Anthropic SDK Messages API generation、streaming、图片理解、user-executed function tools 和 automatic prefix caching。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter，并完成 RemoteContextHint/cache 策略升级：通用 API 使用 `enable_cache/new_items_start_index`，response-style provider 自动管理 response id 与失效 refresh，Anthropic provider 保持 full messages automatic caching。
 
 核心文档：
 
@@ -20,6 +20,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
 - [volcengine-adapter.CN.md](volcengine-adapter.CN.md)
 - [anthropic-adapter.CN.md](anthropic-adapter.CN.md)
+- [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
@@ -47,8 +48,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - `GenerationRequest`、`GenerationResponse`、`GenerationConfig`。
   - `ResponseFormat`，仅支持 JSON Schema structured output。
   - `ReasoningConfig`。
-  - `RemoteContextHint(previous_response_id, covered_item_count, store)`。
-  - `ReplayPolicy`、`ReplayMode`、`RemoteContextInvalidBehavior`。
+  - `RemoteContextHint(enable_cache, new_items_start_index)`。
+  - `ReplayPolicy`、`ReplayMode`。
   - `GenerationStreamEvent` 与 `GenerationStreamAccumulator`。
 - `core.embeddings`：
   - `EmbeddingInput`、`EmbeddingRequest`、`EmbeddingResponse`。
@@ -95,13 +96,13 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - 同 provider/API family 重放时默认优先使用 snapshot。
   - 支持 `ReplayPolicy(mode="normalized_only")`。
   - 支持 `ReplayPolicy(mode="require_provider_native")`。
-  - 支持 `ReplayPolicy(on_remote_context_invalid="replay_without_remote_context")`。
   - OpenAI assistant message `phase` 与通用 `AssistantMessagePhase` 互相映射。
 - Remote context 差分传输：
   - 用户仍传完整 `items`。
-  - `RemoteContextHint.covered_item_count` 表达 previous response 覆盖的历史前缀。
-  - optimized attempt 发送 suffix。
-  - previous response 失效 fallback 重新构造完整 input。
+  - `RemoteContextHint.new_items_start_index` 表达新增 item 的起始位置。
+  - output item snapshot metadata 保存 parent response id。
+  - 找到 anchor response id 时 optimized attempt 发送 suffix。
+  - previous response 失效时自动 refresh 并重新构造完整 input。
 - OpenAI text embeddings。
 - OpenAI Images API：
   - `generate_image()` / `agenerate_image()`。
@@ -146,8 +147,9 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - function tool / function call / function call output。
   - usage/cached/reasoning token mapping。
   - provider-native snapshot 与 same-provider replay。
-  - `RemoteContextHint.previous_response_id + covered_item_count` 差分传输。
-  - previous response 失效时的显式 fallback：`ReplayPolicy(on_remote_context_invalid="replay_without_remote_context")`。
+  - `RemoteContextHint.enable_cache + new_items_start_index` 驱动的差分传输。
+  - output item snapshot metadata 保存 parent response id。
+  - previous response 失效时自动 full-context refresh。
 - Responses streaming：
   - lifecycle、content part、text delta/done、function call arguments、reasoning summary、completed/incomplete/failed/error 与 unknown passthrough。
 - Files API：
@@ -200,9 +202,9 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - provider-native content block snapshot 与 same-provider replay。
   - usage/cache token mapping。
 - Automatic prefix caching：
-  - `RemoteContextHint.store=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
-  - `previous_response_id` 与 `covered_item_count` 兼容接收但忽略。
-  - 不做 `previous_response_id` 差分传输。
+  - `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
+  - `new_items_start_index` 兼容接收但忽略。
+  - 不做 response-style previous response 差分传输。
   - 不暴露 explicit cache control；显式传入 `cache_control` 会抛 `UnsupportedCapabilityError`。
 - Messages streaming：
   - message lifecycle、text delta、tool input JSON delta、thinking delta、usage update、completed/error 与 unknown passthrough。
@@ -243,10 +245,9 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - 不同 provider 的 reasoning effort 取值不同，应通过 capability 字段声明支持集合。
 - 同时支持 Responses API 与 Chat Completions API 的 provider，Python generation adapter 仅使用 Responses API。
 - Provider-side state/cache/previous response 只能作为优化 hint，不改变 Full-context First。
-- `RemoteContextHint` 暂只表达 previous response 覆盖范围与本轮 store hint，不包含 cache policy 或远端过期时间。
-- `RemoteContextHint.store=None` 依赖 provider 默认存储策略；使用 `previous_response_id` 时，关键是被引用 response 生成时已开启存储。
-- Full-context First 要求用户传入完整 `items`，但 provider 请求层可以在覆盖边界明确时只传追加 suffix。
-- Response id 失效后的 fallback/replay 必须由用户显式启用；强制 replay 缺少 provider-native snapshot 时应失败而不是静默降级。
+- `RemoteContextHint` 表达 `enable_cache` 与 `new_items_start_index`，不让用户直接传入 provider response id。
+- Full-context First 要求用户传入完整 `items`，但 provider 请求层可以在新增边界明确且 anchor response id 可用时只传追加 suffix。
+- Response id 失效后的 refresh 由 response-style provider client 自动处理；强制 replay 缺少 provider-native snapshot 时应失败而不是静默降级。
 
 ## 验证
 

@@ -11,6 +11,7 @@
 - [REQ-2026-05-python-openai-adapter.CN.md](requirements/REQ-2026-05-python-openai-adapter.CN.md)：Python OpenAI adapter 需求记录，说明首个 provider adapter 与基础 core 能力落地目标和完成进度。
 - [REQ-2026-05-python-pydantic-structured-output.CN.md](requirements/REQ-2026-05-python-pydantic-structured-output.CN.md)：Python Pydantic structured output 需求记录，跟踪 Pydantic helper、strict schema 和 parsed response convenience。
 - [REQ-2026-06-python-anthropic-adapter.CN.md](requirements/REQ-2026-06-python-anthropic-adapter.CN.md)：Python Anthropic adapter 需求记录，记录 Messages API generation/streaming、图片理解、user-executed function tools 和 automatic prefix caching 支持的完成状态。
+- [REQ-2026-06-remote-context-cache-strategy.CN.md](requirements/REQ-2026-06-remote-context-cache-strategy.CN.md)：RemoteContextHint 与缓存策略升级记录，说明 `enable_cache/new_items_start_index`、response-style 自动 response id 管理、失效 refresh 和 Anthropic automatic cache 的新语义。
 
 ## Design
 
@@ -32,6 +33,7 @@
 - [v0.5-media-generation.CN.md](impls/python/v0.5-media-generation.CN.md)：Python v0.5 Media Generation 方案与实现记录，明确 hosted tools 暂不进入范围，基于 OpenAI Images API 与 Volcengine Ark Images/Content Generation 完成通用图片生成、参考图生成、图片流式生成、视频异步任务和图片/视频 AI 水印控制。
 - [volcengine-adapter.CN.md](impls/python/volcengine-adapter.CN.md)：Python v0.4 Volcengine adapter MVP 详细方案与实现记录，定义 provider identity、Ark SDK-only 调用边界、Responses generation/streaming、Files API、多模态 embedding、capability、replay、测试与验收结果。
 - [anthropic-adapter.CN.md](impls/python/anthropic-adapter.CN.md)：Python Anthropic adapter 实现方案与实现记录，覆盖官方 Anthropic SDK Messages API、generation/streaming、图片理解、function tools、automatic prefix caching、usage/capability 和测试策略。
+- [remote-context-cache-strategy.CN.md](impls/python/remote-context-cache-strategy.CN.md)：Python Remote Context 与 Cache 策略实现记录，说明新 `RemoteContextHint`、snapshot response id、response-style suffix/refresh 和 Anthropic full messages cache 行为。
 - [v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)：Python v0.2 Responses Contract Hardening 设计方案，细化 OpenAI Responses API 参数映射、structured output、streaming event、stream accumulator、错误映射与验收测试。
 - [v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)：Python v0.3 Core API Family Expansion 实现基线，系统说明 items、generation、embedding、resources、media、function/custom tools、capabilities、OpenAI adapter、Pydantic helper 与 replay 的已实现边界。
 - [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)：Python Pydantic Structured Output 便捷层方案与实现记录，说明可选 Pydantic v2 helper、strict schema 生成、最终响应解析、client convenience 与测试策略。

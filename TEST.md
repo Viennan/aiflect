@@ -29,7 +29,8 @@ default unit test command.
 Costly tests must be isolated by pytest markers:
 
 - `costly`: marks a test as non-default and potentially billable.
-- `provider(name)`: identifies the provider, such as `openai` or `volcengine`.
+- `provider(name)`: identifies the provider, such as `openai`, `volcengine`,
+  or `anthropic`.
 - `feature(name)`: identifies the API family, such as `generation`,
   `embedding`, `files`, `image_generation`, or `video_generation`.
 
@@ -45,13 +46,25 @@ The runner must print the provider, features, selected profiles, and selected
 model IDs before asking for confirmation.
 
 The current costly smoke-test framework covers text generation, text embedding,
-image-to-text generation, and image embedding model cases from `creds.json`.
-Image-input tests use raw inline data from `asserts`; they do not upload
-assertion assets through provider File APIs. Provider optional dependencies must
-be installed before running the matching costly tests, for example:
+image-to-text generation, image embedding, and cached multi-turn generation
+model cases from `creds.json`. Cached multi-turn generation covers both
+OpenAI full-context cache-enabled requests, response-id style cache reuse for
+Volcengine adapters, and automatic prompt caching for the Anthropic adapter.
+Response-id style costly tests assert that the second turn used
+`previous_response_id` successfully and did not pass only because the adapter
+refreshed with full context. Image-input tests use raw inline data from
+`asserts`; they do not upload assertion assets through provider File APIs.
+Provider optional dependencies must be installed before running the matching
+costly tests, for example:
+
+Generation costly tests may skip provider 5xx or temporary-unavailable failures
+because they indicate live provider capacity/service availability rather than a
+stable adapter contract. Provider 4xx capability, parameter, or mapping failures
+should still fail.
 
 ```bash
 .venv/bin/python -m pip install -e "python[volcengine,test]"
+.venv/bin/python -m pip install -e "python[anthropic,test]"
 ```
 
 ### Costly Credentials
@@ -160,6 +173,26 @@ File API tests must:
                 "supports_streaming": true,
                 "supports_tools": true,
                 "supports_parallel_tool_calls": true,
+                "input_modalities": ["text", "image"],
+                "output_modalities": ["text"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "anthropic": {
+      "enabled": true,
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "features": {
+        "generation": {
+          "models": [
+            {
+              "id": "claude-model-id",
+              "profile": "cheap",
+              "enabled": true,
+              "capabilities": {
+                "supports_streaming": true,
                 "input_modalities": ["text", "image"],
                 "output_modalities": ["text"]
               }

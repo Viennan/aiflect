@@ -11,10 +11,10 @@ from whero.vatbrain import (
     ClientConfig,
     ImagePart,
     MessageItem,
+    ProviderItemSnapshot,
     ReasoningConfig,
     RemoteContextHint,
-    RemoteContextInvalidBehavior,
-    ReplayPolicy,
+    Role,
     SecretString,
     ToolCallConfig,
 )
@@ -216,6 +216,26 @@ class Contact(BaseModel):
     email: str
 
 
+def _openai_anchor(response_id: str = "resp_old") -> MessageItem:
+    return MessageItem(
+        Role.ASSISTANT,
+        "covered",
+        provider_snapshots=[
+            ProviderItemSnapshot(
+                provider="openai",
+                api_family="responses",
+                item_type="message",
+                payload={
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "covered"}],
+                },
+                metadata={"response_id": response_id},
+            )
+        ],
+    )
+
+
 def test_client_generate_uses_explicit_model_and_common_options() -> None:
     raw_response = SimpleNamespace(
         id="resp_1",
@@ -229,10 +249,10 @@ def test_client_generate_uses_explicit_model_and_common_options() -> None:
 
     response = client.generate(
         model="gpt-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
+        items=[_openai_anchor(), MessageItem.user("hello")],
         reasoning=ReasoningConfig(effort="low"),
         tool_call_config=ToolCallConfig(parallel_tool_calls=True),
-        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     assert response.id == "resp_1"
@@ -242,9 +262,17 @@ def test_client_generate_uses_explicit_model_and_common_options() -> None:
     assert fake.responses.calls[0]["previous_response_id"] == "resp_old"
     assert len(fake.responses.calls[0]["input"]) == 1
     assert fake.responses.calls[0]["input"][0]["role"] == "user"
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": True,
+        "refreshed_after_invalid_context": False,
+        "new_items_start_index": 1,
+    }
 
 
-def test_client_generate_replays_without_remote_context_when_enabled() -> None:
+def test_client_generate_refreshes_invalid_remote_context() -> None:
     raw_response = SimpleNamespace(
         id="resp_2",
         model="gpt-test",
@@ -257,14 +285,10 @@ def test_client_generate_replays_without_remote_context_when_enabled() -> None:
 
     response = client.generate(
         model="gpt-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
+        items=[_openai_anchor(), MessageItem.user("hello")],
         remote_context=RemoteContextHint(
-            previous_response_id="resp_old",
-            covered_item_count=1,
-            store=True,
-        ),
-        replay_policy=ReplayPolicy(
-            on_remote_context_invalid=RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT,
+            enable_cache=True,
+            new_items_start_index=1,
         ),
     )
 
@@ -276,19 +300,27 @@ def test_client_generate_replays_without_remote_context_when_enabled() -> None:
     assert "previous_response_id" not in fake.responses.calls[1]
     assert fake.responses.calls[1]["store"] is True
     assert len(fake.responses.calls[1]["input"]) == 2
-    assert fake.responses.calls[1]["input"][0]["role"] == "system"
+    assert fake.responses.calls[1]["input"][0]["role"] == "assistant"
     assert fake.responses.calls[1]["input"][1]["role"] == "user"
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": False,
+        "refreshed_after_invalid_context": True,
+        "new_items_start_index": 1,
+    }
 
 
-def test_client_generate_does_not_replay_remote_context_by_default() -> None:
+def test_client_generate_does_not_refresh_when_previous_response_id_was_not_sent() -> None:
     exc = FakePreviousResponseExpiredError("expired")
     client = OpenAIClient(client=FakeOpenAIRaising(exc), async_client=object())
 
     try:
         client.generate(
             model="gpt-test",
-            items=[MessageItem.system("covered"), MessageItem.user("hello")],
-            remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
+            items=[MessageItem.assistant("covered"), MessageItem.user("hello")],
+            remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
         )
     except ProviderRequestError as wrapped:
         assert wrapped.cause is exc
@@ -350,11 +382,8 @@ async def test_async_client_generate_replays_without_remote_context_when_enabled
 
     response = await client.agenerate(
         model="gpt-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
-        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
-        replay_policy=ReplayPolicy(
-            on_remote_context_invalid=RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT,
-        ),
+        items=[_openai_anchor(), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     assert response.id == "resp_async"
@@ -363,6 +392,14 @@ async def test_async_client_generate_replays_without_remote_context_when_enabled
     assert len(fake_async.responses.calls[0]["input"]) == 1
     assert "previous_response_id" not in fake_async.responses.calls[1]
     assert len(fake_async.responses.calls[1]["input"]) == 2
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": False,
+        "refreshed_after_invalid_context": True,
+        "new_items_start_index": 1,
+    }
 
 
 @pytest.mark.anyio
@@ -419,7 +456,7 @@ def test_client_stream_generate_maps_events() -> None:
     assert events[0].type == StreamEventType.TEXT_DELTA.value
 
 
-def test_client_stream_generate_replays_without_remote_context_when_enabled() -> None:
+def test_client_stream_generate_refreshes_invalid_remote_context() -> None:
     stream = [
         SimpleNamespace(
             type="response.output_text.delta",
@@ -434,11 +471,8 @@ def test_client_stream_generate_replays_without_remote_context_when_enabled() ->
     events = list(
         client.stream_generate(
             model="gpt-test",
-            items=[MessageItem.system("covered"), MessageItem.user("hello")],
-            remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
-            replay_policy=ReplayPolicy(
-                on_remote_context_invalid=RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT,
-            ),
+            items=[_openai_anchor(), MessageItem.user("hello")],
+            remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
         )
     )
 

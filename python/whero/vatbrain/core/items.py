@@ -360,6 +360,23 @@ def provider_snapshot_for(
     return None
 
 
+def provider_response_id_for(
+    item: Item,
+    *,
+    provider: str,
+    api_family: str,
+) -> str | None:
+    """Return the provider response id recorded on a matching item snapshot."""
+
+    snapshot = provider_snapshot_for(item, provider=provider, api_family=api_family, replayable=False)
+    if snapshot is None:
+        return None
+    response_id = snapshot.metadata.get("response_id")
+    if isinstance(response_id, str) and response_id:
+        return response_id
+    return None
+
+
 def _validate_single_source(name: str, **sources: str | None) -> None:
     provided = [source_name for source_name, value in sources.items() if bool(value)]
     if not provided:

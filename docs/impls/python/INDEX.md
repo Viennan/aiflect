@@ -17,6 +17,7 @@
 
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)：OpenAI Responses API 合约加固实现方案，覆盖参数映射、structured output、streaming event、stream accumulator 和错误映射。
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)：Python v0.3 core/API family 实现基线，记录 items、generation、embedding、resources、media、tools、capabilities、OpenAI adapter、Pydantic helper 与 replay 边界。
+- [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)：Remote Context 与 Cache 策略实现记录，覆盖 `RemoteContextHint.enable_cache/new_items_start_index`、snapshot response id、response-style suffix/refresh 与 Anthropic automatic cache。
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)：Media generation 实现方案与实现记录，覆盖 OpenAI Images API、Volcengine Ark Images API 和 Volcengine Content Generation 视频任务。
 
 ### Provider Adapters
@@ -35,3 +36,4 @@
 - [REQ-2026-05-python-openai-adapter.CN.md](../../requirements/REQ-2026-05-python-openai-adapter.CN.md)：Python OpenAI adapter 需求记录。
 - [REQ-2026-05-python-pydantic-structured-output.CN.md](../../requirements/REQ-2026-05-python-pydantic-structured-output.CN.md)：Python Pydantic structured output 需求记录。
 - [REQ-2026-06-python-anthropic-adapter.CN.md](../../requirements/REQ-2026-06-python-anthropic-adapter.CN.md)：Python Anthropic adapter 需求记录。
+- [REQ-2026-06-remote-context-cache-strategy.CN.md](../../requirements/REQ-2026-06-remote-context-cache-strategy.CN.md)：RemoteContextHint 与缓存策略升级需求记录。

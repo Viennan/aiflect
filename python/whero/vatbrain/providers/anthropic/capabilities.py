@@ -41,8 +41,8 @@ def get_adapter_capability() -> AdapterCapability:
             metadata={
                 "api_family": "messages",
                 "remote_context_semantics": (
-                    "store maps to Anthropic automatic prompt caching; "
-                    "previous_response_id is ignored; no transport delta"
+                    "enable_cache maps to Anthropic automatic prompt caching; "
+                    "new_items_start_index is ignored; no transport delta"
                 ),
             },
         ),

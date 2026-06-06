@@ -13,9 +13,9 @@ from whero.vatbrain import (
     ImagePart,
     MediaKind,
     MessageItem,
+    ProviderItemSnapshot,
     RemoteContextHint,
-    RemoteContextInvalidBehavior,
-    ReplayPolicy,
+    Role,
     SecretString,
     TaskStatus,
     VideoPart,
@@ -208,6 +208,26 @@ class FakeArk:
         )
 
 
+def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
+    return MessageItem(
+        Role.ASSISTANT,
+        "covered",
+        provider_snapshots=[
+            ProviderItemSnapshot(
+                provider="volcengine",
+                api_family="responses",
+                item_type="message",
+                payload={
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "covered"}],
+                },
+                metadata={"response_id": response_id},
+            )
+        ],
+    )
+
+
 class FakeArkFallback:
     def __init__(self, *, first_exc: Exception, response: object) -> None:
         self.responses = FallbackResponses(first_exc=first_exc, result=response)
@@ -313,8 +333,8 @@ def test_client_generate_uses_ark_responses_endpoint() -> None:
 
     response = client.generate(
         model="doubao-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
-        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
+        items=[_volcengine_anchor(), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     assert response.id == "resp_1"
@@ -322,9 +342,17 @@ def test_client_generate_uses_ark_responses_endpoint() -> None:
     assert fake.responses.calls[0]["previous_response_id"] == "resp_old"
     assert len(fake.responses.calls[0]["input"]) == 1
     assert fake.responses.calls[0]["input"][0]["role"] == "user"
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": True,
+        "refreshed_after_invalid_context": False,
+        "new_items_start_index": 1,
+    }
 
 
-def test_client_generate_replays_without_remote_context_when_enabled() -> None:
+def test_client_generate_refreshes_invalid_remote_context() -> None:
     fake = FakeArkFallback(
         first_exc=FakePreviousResponseExpiredError("expired"),
         response=_raw_response("resp_2"),
@@ -333,11 +361,8 @@ def test_client_generate_replays_without_remote_context_when_enabled() -> None:
 
     response = client.generate(
         model="doubao-test",
-        items=[MessageItem.system("covered"), MessageItem.user("hello")],
-        remote_context=RemoteContextHint(previous_response_id="resp_old", covered_item_count=1),
-        replay_policy=ReplayPolicy(
-            on_remote_context_invalid=RemoteContextInvalidBehavior.REPLAY_WITHOUT_REMOTE_CONTEXT,
-        ),
+        items=[_volcengine_anchor(), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(enable_cache=True, new_items_start_index=1),
     )
 
     assert response.id == "resp_2"
@@ -345,6 +370,14 @@ def test_client_generate_replays_without_remote_context_when_enabled() -> None:
     assert fake.responses.calls[0]["previous_response_id"] == "resp_old"
     assert "previous_response_id" not in fake.responses.calls[1]
     assert len(fake.responses.calls[1]["input"]) == 2
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": False,
+        "refreshed_after_invalid_context": True,
+        "new_items_start_index": 1,
+    }
 
 
 def test_client_stream_generate_maps_events() -> None:

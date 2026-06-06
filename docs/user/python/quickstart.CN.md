@@ -119,7 +119,7 @@ response = client.generate(
 
 ## Remote Context 与 Replay
 
-`RemoteContextHint` 用于表达 provider-side previous response 和 store hint。它是优化提示，不是 vatbrain 的会话状态模型。
+`RemoteContextHint` 用于表达 provider-side cache 和新增边界 hint。它是优化提示，不是 vatbrain 的会话状态模型。
 
 ```python
 from whero.vatbrain import MessageItem, RemoteContextHint
@@ -129,7 +129,7 @@ first_items = [MessageItem.user("Summarize the contract.")]
 first_response = client.generate(
     model="gpt-5.1",
     items=first_items,
-    remote_context=RemoteContextHint(store=True),
+    remote_context=RemoteContextHint(enable_cache=True),
 )
 
 history_items = [*first_items, *first_response.output_items]
@@ -139,8 +139,8 @@ response = client.generate(
     model="gpt-5.1",
     items=items,
     remote_context=RemoteContextHint(
-        previous_response_id=first_response.id,
-        covered_item_count=len(history_items),
+        enable_cache=True,
+        new_items_start_index=len(history_items),
     ),
 )
 ```
@@ -148,10 +148,11 @@ response = client.generate(
 要点：
 
 - 用户侧仍传入完整 `items`。
-- `covered_item_count` 表示 `previous_response_id` 已覆盖完整 `items` 中的历史前缀。
-- OpenAI adapter 在边界明确时只向 provider 发送追加 suffix。
-- Anthropic adapter 接受 `previous_response_id` 与 `covered_item_count` 但会忽略它们；`RemoteContextHint.store=True` 会开启 automatic prefix caching，且仍发送完整上下文。
-- `store=True` 只影响本轮 response 未来是否便于被引用；不能补救历史 response 未存储的问题。
+- `new_items_start_index` 表示完整 `items` 中从哪里开始是本轮新增 item。
+- OpenAI/Volcengine adapter 会从边界前一个 item 的 provider snapshot metadata 中读取 response id；找到时只向 provider 发送追加 suffix，找不到时发送完整 `items`。
+- 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应先验证其支持 `previous_response_id` / stored response 链接能力，再使用 `new_items_start_index`；未验证前可以只启用 `enable_cache=True` 或不传 `remote_context`，保持完整 `items` 请求。
+- Anthropic adapter 忽略 `new_items_start_index`；`RemoteContextHint.enable_cache=True` 会开启 automatic prompt caching，且仍发送完整上下文。
+- response id 由 adapter 写入 provider snapshot metadata，用户不需要保存或传回。
 
 Provider 返回的 output item 会在 `provider_snapshots` 字段保留原始 payload。OpenAI adapter 默认优先使用 snapshot 做同 provider 高保真重放，以保留 OpenAI `phase` 等原生字段。手工构造 assistant 历史消息时可使用通用 `AssistantMessagePhase`：
 
@@ -179,21 +180,7 @@ response = client.generate(
 )
 ```
 
-当 `previous_response_id` 失效时，默认抛错。只有显式启用 fallback 时，OpenAI client 才会移除失效 remote context，用完整 `items` 自动重试一次：
-
-```python
-response = client.generate(
-    model="gpt-5.1",
-    items=history,
-    remote_context=RemoteContextHint(
-        previous_response_id="resp_previous",
-        covered_item_count=1,
-    ),
-    replay_policy=ReplayPolicy(
-        on_remote_context_invalid="replay_without_remote_context",
-    ),
-)
-```
+当 response-style provider 返回明确的 previous response/context invalid 或 expired 错误时，OpenAI/Volcengine client 会自动移除失效 response id，并用完整 `items` refresh 一次。该行为只针对明确的 remote context 失效错误，不是通用网络重试。
 
 跨 provider replay 暂不支持。
 

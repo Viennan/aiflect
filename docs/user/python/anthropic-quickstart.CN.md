@@ -68,7 +68,7 @@ for item in response.output_items:
 
 ## Automatic Prefix Cache
 
-Anthropic adapter 将 `RemoteContextHint.store=True` 映射为 Anthropic automatic prompt caching。`previous_response_id` 可以传入任意值，但 adapter 会忽略它；每次请求仍从完整 `items` 构造 full Messages API 输入。
+Anthropic adapter 将 `RemoteContextHint.enable_cache=True` 映射为 Anthropic automatic prompt caching。`new_items_start_index` 可以复用 response-style provider 的调用形状，但 adapter 会忽略它；每次请求仍从完整 `items` 构造 full Messages API 输入。
 
 ```python
 from whero.vatbrain import GenerationConfig, MessageItem, RemoteContextHint
@@ -79,7 +79,7 @@ first_response = client.generate(
     model="claude-sonnet-4-5",
     items=first_items,
     generation_config=GenerationConfig(max_output_tokens=300),
-    remote_context=RemoteContextHint(store=True),
+    remote_context=RemoteContextHint(enable_cache=True),
 )
 
 history_items = [*first_items, *first_response.output_items]
@@ -90,9 +90,8 @@ response = client.generate(
     items=next_items,
     generation_config=GenerationConfig(max_output_tokens=300),
     remote_context=RemoteContextHint(
-        previous_response_id=first_response.id or "",
-        covered_item_count=len(history_items),
-        store=True,
+        enable_cache=True,
+        new_items_start_index=len(history_items),
     ),
 )
 ```
@@ -100,8 +99,8 @@ response = client.generate(
 要点：
 
 - 用户侧仍传入完整 `items`。
-- `store=True` 开启 automatic prompt caching。
-- `previous_response_id` 与 `covered_item_count` 只用于兼容 Responses API 风格用户代码，Anthropic adapter 不使用它们做差分传输。
+- `enable_cache=True` 开启 automatic prompt caching。
+- `new_items_start_index` 只用于兼容 response-style provider 的新增边界形状，Anthropic adapter 不使用它做差分传输。
 - 不支持显式传入 Anthropic `cache_control`；如在 request、remote context 或 tool `provider_options` 中设置 `cache_control`，adapter 会抛出 `UnsupportedCapabilityError`。
 
 Cache usage 会映射到 `Usage`：
@@ -198,7 +197,7 @@ Anthropic model capability 默认 unknown，可通过 `model_capability_override
 - 不支持 provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
 - 暂不支持 `ResponseFormat` structured output。
 - 暂不支持 `ReasoningConfig` 请求映射；provider 返回的 thinking content block 会尽量映射为 `ReasoningItem`。
-- 不支持 `previous_response_id` 差分传输，也没有 remote context invalid fallback。
+- 不支持 response-style previous response 差分传输，也没有 response-style remote context refresh。
 
 ## 参考
 

@@ -209,6 +209,11 @@ def costly_client(costly_model_case: CostlyModelCase) -> Any:
         from whero.vatbrain.providers.volcengine import VolcengineClient
 
         return VolcengineClient(**client_options)
+    if costly_model_case.provider == "anthropic":
+        pytest.importorskip("anthropic", reason="Anthropic costly tests require python[anthropic]")
+        from whero.vatbrain.providers.anthropic import AnthropicClient
+
+        return AnthropicClient(**client_options)
     pytest.skip(f"unsupported costly provider: {costly_model_case.provider}")
 
 

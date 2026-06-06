@@ -61,9 +61,8 @@ def test_generation_request_maps_messages_images_tools_and_cache_hint() -> None:
             tool_choice=ToolChoice.REQUIRED,
         ),
         remote_context=RemoteContextHint(
-            previous_response_id="ignored",
-            covered_item_count=2,
-            store=True,
+            enable_cache=True,
+            new_items_start_index=2,
         ),
         provider_options={"top_k": 10},
     )
@@ -184,8 +183,8 @@ def test_anthropic_mapper_rejects_explicit_cache_control() -> None:
             GenerationRequest(
                 **base_request,
                 remote_context=RemoteContextHint(
-                    previous_response_id="ignored",
-                    covered_item_count=1,
+                    enable_cache=True,
+                    new_items_start_index=1,
                     provider_options={"cache_control": {"type": "ephemeral"}},
                 ),
             )

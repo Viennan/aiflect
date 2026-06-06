@@ -213,7 +213,7 @@ Anthropic client 方法：
 
 Anthropic adapter 支持文本、图片理解、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
 
-Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ResponseFormat` 或 `ReasoningConfig` 请求映射。`RemoteContextHint.store=True` 会启用 automatic prompt caching；`previous_response_id` 与 `covered_item_count` 会被接受但忽略，不触发差分传输。
+Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ResponseFormat` 或 `ReasoningConfig` 请求映射。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
 
 ## Items
 
@@ -406,7 +406,7 @@ response = await client.agenerate(
 - `response_format`：JSON Schema structured output。
 - `reasoning`：reasoning 行为配置。
 - `tool_call_config`：工具调用行为配置。
-- `remote_context`：previous response/store hint。
+- `remote_context`：provider-side cache/delta hint。
 - `replay_policy`：provider-native replay 行为。
 - `provider_options`：透传 provider 请求参数。
 
@@ -514,26 +514,37 @@ tool_call_config = ToolCallConfig(
 
 ### RemoteContextHint
 
-`RemoteContextHint` 表达 provider-side previous response/store 优化 hint：
+`RemoteContextHint` 表达 provider-side cache/delta 优化 hint：
 
 ```python
 from whero.vatbrain import RemoteContextHint
 
 remote_context = RemoteContextHint(
-    previous_response_id="resp_123",
-    covered_item_count=4,
-    store=True,
+    enable_cache=True,
+    new_items_start_index=4,
 )
 ```
 
 字段：
 
-- `previous_response_id`：provider response id。
-- `covered_item_count`：该 response id 已覆盖完整 `items` 的前缀 item 数。
-- `store`：是否请求 provider 存储本轮 response。
+- `enable_cache`：是否启用 provider-side cache/stored response 优化。
+- `new_items_start_index`：完整 `items` 中新增 item 的起始 index。
 - `provider_options`：provider-specific remote context 参数。
 
-用户仍必须传入完整 `items`。OpenAI adapter 在 `previous_response_id` 与 `covered_item_count` 同时存在时，只向 provider 发送未覆盖的 suffix；如果 previous response 失效且用户显式启用 fallback，则会重新用完整 `items` 请求。
+用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching。
+
+如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应在目标服务上验证 `previous_response_id` / stored response 链接能力后再使用 `new_items_start_index`。未验证前可以只设置 `enable_cache=True` 或完全不传 `remote_context`，由 adapter 发送完整 `items`；这样不会改变对话语义，只是不会获得 response-id 差分传输优化。
+
+OpenAI/Volcengine 非流式 generation 会在 `GenerationResponse.metadata["remote_context"]` 中记录 response-style remote context 的请求路径：
+
+- `api_family`: `"responses"`。
+- `cache_enabled`: 本次 request 是否启用 cache。
+- `attempted_previous_response_id`: 初始请求是否携带 `previous_response_id`。
+- `final_request_used_previous_response_id`: 最终成功的请求是否携带 `previous_response_id`。
+- `refreshed_after_invalid_context`: 是否因 previous response/context invalid 或 expired 自动 refresh。
+- `new_items_start_index`: 请求中提供的新增 item 起始位置。
+
+当 `attempted_previous_response_id=True`、`final_request_used_previous_response_id=True` 且 `refreshed_after_invalid_context=False` 时，可以确认该次 response-style 请求直接使用 previous response 成功，而不是通过 full-context refresh 兜底成功。
 
 ### ReplayPolicy
 
@@ -542,7 +553,6 @@ from whero.vatbrain import ReplayPolicy
 
 policy = ReplayPolicy(
     mode="prefer_provider_native",
-    on_remote_context_invalid="raise",
 )
 ```
 
@@ -551,11 +561,6 @@ policy = ReplayPolicy(
 - `normalized_only`：只用 normalized mapper。
 - `prefer_provider_native`：有 provider snapshot 时优先使用，缺失时降级。
 - `require_provider_native`：强制使用 snapshot，缺失即报错。
-
-`on_remote_context_invalid`：
-
-- `raise`：previous response 失效时抛错。
-- `replay_without_remote_context`：显式允许移除失效 remote context，用完整 `items` 自动重试一次。
 
 `cross_provider` 当前只支持 `unsupported`。
 
@@ -1293,9 +1298,9 @@ from whero.vatbrain.core.errors import (
 - user function tool。
 - OpenAI custom tool。
 - tool call result 回填。
-- `previous_response_id` / `store` remote context hint。
-- 基于 `covered_item_count` 的 OpenAI previous response 差分传输。
-- previous response 失效时的显式 fallback replay。
+- `RemoteContextHint.enable_cache/new_items_start_index` remote context hint。
+- 基于 snapshot response id 与新增边界的 OpenAI previous response 差分传输。
+- previous response 失效时的自动 full-context refresh。
 - provider-native item snapshot replay。
 - OpenAI assistant message `phase` 与 `AssistantMessagePhase`。
 - text embedding。
@@ -1329,9 +1334,9 @@ from whero.vatbrain.core.errors import (
 - `ReasoningConfig.effort -> reasoning.effort`。
 - user function tool。
 - function call result 回填。
-- `previous_response_id` / `store` remote context hint。
-- 基于 `covered_item_count` 的 previous response 差分传输。
-- previous response 失效时的显式 fallback replay。
+- `RemoteContextHint.enable_cache/new_items_start_index` remote context hint。
+- 基于 snapshot response id 与新增边界的 previous response 差分传输。
+- previous response 失效时的自动 full-context refresh。
 - provider-native item snapshot replay。
 - Files API upload/retrieve/list/delete/wait。
 - 多模态 embedding、instructions、dense/sparse vector。
@@ -1364,8 +1369,8 @@ from whero.vatbrain.core.errors import (
 - user function tool。
 - `tool_use` -> `FunctionCallItem`。
 - `FunctionResultItem` -> `tool_result`。
-- `RemoteContextHint.store=True` 映射为 automatic prefix caching。
-- `previous_response_id` 与 `covered_item_count` 兼容接收但忽略。
+- `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
+- `new_items_start_index` 兼容接收但忽略。
 - provider-native content block snapshot replay。
 - usage cache token mapping。
 - adapter/model capability 查询与用户覆写。
@@ -1375,8 +1380,8 @@ from whero.vatbrain.core.errors import (
 - Files API。
 - embedding。
 - media generation。
-- `previous_response_id` 差分传输。
-- remote context invalid fallback。
+- previous response 差分传输。
+- response-style remote context refresh。
 - `ResponseFormat` structured output。
 - `ReasoningConfig` 请求映射。
 - `FunctionToolType.CUSTOM`。

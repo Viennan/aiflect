@@ -52,21 +52,15 @@ class ReasoningConfig:
 
 @dataclass(frozen=True, slots=True)
 class RemoteContextHint:
-    """Provider-side previous response/store hints that do not replace full context."""
+    """Provider-side cache/delta hints that do not replace full context."""
 
-    previous_response_id: str | None = None
-    covered_item_count: int | None = None
-    store: bool | None = None
+    enable_cache: bool = False
+    new_items_start_index: int | None = None
     provider_options: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.covered_item_count is not None:
-            if self.previous_response_id is None:
-                raise ValueError(
-                    "RemoteContextHint.covered_item_count requires previous_response_id."
-                )
-            if self.covered_item_count < 0:
-                raise ValueError("RemoteContextHint.covered_item_count must be non-negative.")
+        if self.new_items_start_index is not None and self.new_items_start_index < 0:
+            raise ValueError("RemoteContextHint.new_items_start_index must be non-negative.")
         object.__setattr__(self, "provider_options", dict(self.provider_options))
 
 
@@ -78,28 +72,15 @@ class ReplayMode(StrEnum):
     REQUIRE_PROVIDER_NATIVE = "require_provider_native"
 
 
-class RemoteContextInvalidBehavior(StrEnum):
-    """Requested behavior when a provider-side context hint is invalid."""
-
-    RAISE = "raise"
-    REPLAY_WITHOUT_REMOTE_CONTEXT = "replay_without_remote_context"
-
-
 @dataclass(frozen=True, slots=True)
 class ReplayPolicy:
     """Controls same-provider replay from normalized items and native snapshots."""
 
     mode: ReplayMode | str = ReplayMode.PREFER_PROVIDER_NATIVE
-    on_remote_context_invalid: RemoteContextInvalidBehavior | str = RemoteContextInvalidBehavior.RAISE
     cross_provider: str = "unsupported"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", ReplayMode(self.mode))
-        object.__setattr__(
-            self,
-            "on_remote_context_invalid",
-            RemoteContextInvalidBehavior(self.on_remote_context_invalid),
-        )
         if self.cross_provider != "unsupported":
             raise ValueError("ReplayPolicy.cross_provider currently supports 'unsupported' only.")
 
@@ -157,11 +138,11 @@ class GenerationRequest:
             raise ValueError("GenerationRequest.items must not be empty.")
         if (
             remote_context is not None
-            and remote_context.covered_item_count is not None
-            and remote_context.covered_item_count > len(normalized_items)
+            and remote_context.new_items_start_index is not None
+            and remote_context.new_items_start_index > len(normalized_items)
         ):
             raise ValueError(
-                "RemoteContextHint.covered_item_count must be less than or equal to "
+                "RemoteContextHint.new_items_start_index must be less than or equal to "
                 "GenerationRequest.items length."
             )
         object.__setattr__(self, "model", model)
