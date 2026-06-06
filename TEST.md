@@ -45,6 +45,19 @@ Non-interactive usage must require an explicit consent flag, such as `--yes`.
 The runner must print the provider, features, selected profiles, and selected
 model IDs before asking for confirmation.
 
+To diagnose whether an OpenAI or OpenAI-compatible route supports chained
+Responses API context through `previous_response_id`, use:
+
+```bash
+scripts/verify-openai-previous-response-id --model gpt-5.5 --yes
+```
+
+The diagnostic reads only the `openai` provider entry from `creds.json`, resolves
+`api_key_env` from the current environment, creates one stored response, and then
+sends a second request with `previous_response_id`. It must not print or persist
+raw API keys. Like costly tests, it may create billable usage and requires
+interactive confirmation unless `--yes` is passed.
+
 The current costly smoke-test framework covers text generation, text embedding,
 image-to-text generation, image embedding, and cached multi-turn generation
 model cases from `creds.json`. Cached multi-turn generation covers both
