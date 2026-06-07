@@ -1,12 +1,12 @@
 # Python 快速开始
 
-状态：v0.6
+状态：v0.7
 日期：2026-05-05
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 读者路径
 
-本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine / Anthropic adapter 支持范围见 [api-reference.CN.md](api-reference.CN.md)。Volcengine provider 细节见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)。Anthropic provider 细节见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
+本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围见 [api-reference.CN.md](api-reference.CN.md)。Volcengine provider 细节见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)。Anthropic provider 细节见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)。DeepSeek provider 细节见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 是 provider-neutral 的推理调用抽象层，不是 agent runtime。它不会自动选择 provider、自动选择 model、自动 fallback、自动执行工具或自动维护远端会话。用户代码始终掌控 provider、model、上下文、工具执行和下一轮调用。
 
@@ -21,11 +21,12 @@ cd python
 ../.venv/bin/python -m pytest
 ```
 
-OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfig(api_key=...)` 提供。Volcengine 与 Anthropic adapter 使用 optional extra，初始化时同样必须显式传入 LLM API key，即 `api_key` / `ClientConfig.api_key`。
+OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfig(api_key=...)` 提供。Volcengine、Anthropic 与 DeepSeek adapter 使用 optional extra，初始化时同样必须显式传入 LLM API key，即 `api_key` / `ClientConfig.api_key`。
 
 ```bash
 .venv/bin/python -m pip install -e "python[volcengine,test]"
 .venv/bin/python -m pip install -e "python[anthropic,test]"
+.venv/bin/python -m pip install -e "python[deepseek,test]"
 ```
 
 初始化 client：
@@ -34,10 +35,12 @@ OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfi
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
 from whero.vatbrain.providers.anthropic import AnthropicClient
+from whero.vatbrain.providers.deepseek import DeepSeekClient
 
 openai_client = OpenAIClient(api_key="...")
 volcengine_client = VolcengineClient(api_key="...")
 anthropic_client = AnthropicClient(api_key="...")
+deepseek_client = DeepSeekClient(api_key="...")
 ```
 
 也可以显式传入 provider client 参数：
@@ -623,9 +626,10 @@ except ProviderRequestError as exc:
 
 ## 当前限制
 
-- 已实现 OpenAI、Volcengine 与 Anthropic provider。
+- 已实现 OpenAI、Volcengine、Anthropic 与 DeepSeek provider；DeepSeek 当前仅支持 `api_format="anthropic"` 的 Anthropic-compatible Messages API。
 - OpenAI / Volcengine 文本 generation 都使用 Responses API，不提供 Chat Completions fallback。
 - Anthropic 文本 generation 使用官方 Anthropic SDK Messages API；要求 `GenerationConfig.max_output_tokens` 或 provider-native `max_tokens`。
+- DeepSeek 文本 generation 使用 DeepSeek Anthropic-compatible Messages API；要求 `GenerationConfig.max_output_tokens` 或 provider-native `max_tokens`，不支持 structured output、图片/文件/音频/视频输入、embedding、Files API 或 media generation。
 - Volcengine adapter 只使用 Ark SDK 原生 surface，不使用 OpenAI-compatible surface。
 - OpenAI embedding 仅支持文本输入；Volcengine embedding 支持单样本多模态输入。
 - Anthropic adapter 不支持 embedding、Files API 或 media generation。
@@ -642,6 +646,7 @@ except ProviderRequestError as exc:
 - [api-reference.CN.md](api-reference.CN.md)
 - [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)
 - [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)
+- [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)
 - [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)
 - [high-level-design.CN.md](../../design/high-level-design.CN.md)
 - [impls/python/STATUS.md](../../impls/python/STATUS.md)

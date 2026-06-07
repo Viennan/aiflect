@@ -30,7 +30,7 @@ Costly tests must be isolated by pytest markers:
 
 - `costly`: marks a test as non-default and potentially billable.
 - `provider(name)`: identifies the provider, such as `openai`, `volcengine`,
-  or `anthropic`.
+  `anthropic`, or `deepseek`.
 - `feature(name)`: identifies the API family, such as `generation`,
   `embedding`, `files`, `image_generation`, or `video_generation`.
 
@@ -78,6 +78,7 @@ should still fail.
 ```bash
 .venv/bin/python -m pip install -e "python[volcengine,test]"
 .venv/bin/python -m pip install -e "python[anthropic,test]"
+.venv/bin/python -m pip install -e "python[deepseek,test]"
 ```
 
 ### Costly Credentials
@@ -210,6 +211,44 @@ File API tests must:
                 "supports_streaming": true,
                 "supports_structured_output": true,
                 "input_modalities": ["text", "image"],
+                "output_modalities": ["text"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "deepseek": {
+      "enabled": true,
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "base_url": "https://api.deepseek.com/anthropic",
+      "features": {
+        "generation": {
+          "models": [
+            {
+              "id": "deepseek-chat",
+              "profile": "cheap",
+              "enabled": true,
+              "capabilities": {
+                "supports_streaming": true,
+                "supports_tools": true,
+                "supports_reasoning_config": false,
+                "supports_structured_output": false,
+                "input_modalities": ["text"],
+                "output_modalities": ["text"]
+              }
+            },
+            {
+              "id": "deepseek-reasoner",
+              "profile": "standard",
+              "enabled": true,
+              "capabilities": {
+                "supports_streaming": true,
+                "supports_tools": true,
+                "supports_reasoning_config": true,
+                "supported_reasoning_efforts": ["high", "max"],
+                "supports_structured_output": false,
+                "input_modalities": ["text"],
                 "output_modalities": ["text"]
               }
             }

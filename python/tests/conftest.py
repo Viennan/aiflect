@@ -214,6 +214,11 @@ def costly_client(costly_model_case: CostlyModelCase) -> Any:
         from whero.vatbrain.providers.anthropic import AnthropicClient
 
         return AnthropicClient(**client_options)
+    if costly_model_case.provider == "deepseek":
+        pytest.importorskip("anthropic", reason="DeepSeek costly tests require python[deepseek]")
+        from whero.vatbrain.providers.deepseek import DeepSeekClient
+
+        return DeepSeekClient(**client_options)
     pytest.skip(f"unsupported costly provider: {costly_model_case.provider}")
 
 

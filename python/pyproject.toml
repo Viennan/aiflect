@@ -18,6 +18,9 @@ pydantic = [
 anthropic = [
     "anthropic>=0.105.2,<1",
 ]
+deepseek = [
+    "anthropic>=0.105.2,<1",
+]
 volcengine = [
     "volcengine-python-sdk[ark]>=5.0.30,<6",
 ]

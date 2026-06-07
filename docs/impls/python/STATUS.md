@@ -1,7 +1,7 @@
 # Python 实现状态
 
-状态：v0.6 Anthropic adapter、Anthropic structured output 与 remote context cache 策略升级已完成
-日期：2026-05-05
+状态：v0.7 DeepSeek provider 已完成
+日期：2026-06-07
 最近更新：2026-06-07
 
 ## 定位
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter、Anthropic structured output，并完成 RemoteContextHint/cache 策略升级：通用 API 使用 `enable_cache/new_items_start_index`，response-style provider 自动管理 response id 与失效 refresh，Anthropic provider 保持 full messages automatic caching。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSeek provider：在既有 OpenAI、Volcengine、Anthropic provider 基线上，新增 DeepSeek Anthropic-compatible Messages API adapter，并完成 `api_format` 初始化参数、text generation/streaming、function tools、reasoning、cache hint 兼容、capability、测试与文档同步。Anthropic provider 已补充 `ReasoningConfig` extended thinking 请求映射。
 
 核心文档：
 
@@ -20,6 +20,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md)
 - [volcengine-adapter.CN.md](volcengine-adapter.CN.md)
 - [anthropic-adapter.CN.md](anthropic-adapter.CN.md)
+- [deepseek-adapter.CN.md](deepseek-adapter.CN.md)
 - [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
@@ -33,7 +34,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - Python 包脚手架与 `pyproject.toml`。
 - 通用 client 初始化配置：`ClientConfig`。
 - `SecretString`：provider adapter 用于存储 LLM API key。
-- OpenAI / Volcengine / Anthropic adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
+- OpenAI / Volcengine / Anthropic / DeepSeek adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
 - 默认单元测试不依赖真实 provider API。
 
 ### Core
@@ -195,6 +196,10 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - Messages generation：
   - text/image input。
   - JSON Schema structured output via `output_config.format`。
+  - `ReasoningConfig.mode disabled/none` -> `thinking={"type": "disabled"}`。
+  - `ReasoningConfig.budget_tokens` -> `thinking={"type": "enabled", "budget_tokens": ...}`。
+  - `ReasoningConfig.mode auto/enabled/adaptive` -> `thinking={"type": "adaptive"}`。
+  - `ReasoningConfig.effort` -> `output_config.effort`。
   - initial system/developer instruction prefix 映射为 Anthropic top-level `system`。
   - Anthropic Messages API 要求 `max_tokens`；通过 `GenerationConfig.max_output_tokens` 或 provider-native `provider_options["max_tokens"]` 提供。
   - user-executed function tools。
@@ -202,7 +207,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - `FunctionResultItem` -> `tool_result`。
   - `thinking` / `redacted_thinking` content block 尽量映射为 `ReasoningItem`。
   - provider-native content block snapshot 与 same-provider replay。
-  - usage/cache token mapping。
+  - usage/cache/reasoning token mapping。
   - structured output 与 assistant message prefill 不兼容；同用时提前抛 `UnsupportedCapabilityError`。
   - 拒绝显式 provider-native `output_config` 与旧 beta `output_format`，用户统一使用 `ResponseFormat`。
 - Parsed structured output：
@@ -216,9 +221,48 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - Messages streaming：
   - message lifecycle、text delta、tool input JSON delta、thinking delta、usage update、completed/error 与 unknown passthrough。
 - Capability：
-  - adapter capability 声明 generation/streaming/async/structured output/function tools/usage。
+  - adapter capability 声明 generation/streaming/async/structured output/reasoning/function tools/usage。
   - text/image input modality。
   - 不支持 embedding、Files API、media generation、provider-hosted/server tools、SDK Tool Runner。
+  - model capability 默认 unknown，支持用户 overrides。
+
+### DeepSeek Adapter
+
+- Provider package：`whero.vatbrain.providers.deepseek`。
+- Optional dependency：`whero-vatbrain[deepseek]`，使用 `anthropic>=0.105.2,<1` 访问 DeepSeek Anthropic-compatible endpoint。
+- Client：`DeepSeekClient`。
+- API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
+- 初始化参数新增 `api_format`：
+  - `api_format="anthropic"`：已实现，默认值。
+  - `api_format="openai_completion"`：预留但未实现，初始化时抛 `ValueError`。
+- Anthropic-compatible mode 默认 `base_url="https://api.deepseek.com/anthropic"`；显式 `base_url` 优先于 `ClientConfig.base_url`，二者缺失时使用默认值。
+- 严格使用 Anthropic Python SDK 调用 DeepSeek Anthropic 兼容接口：
+  - `Anthropic` / `AsyncAnthropic`。
+  - `messages.create`。
+- Messages generation：
+  - text-only input。
+  - initial system/developer instruction prefix 映射为 top-level `system`。
+  - Anthropic-compatible Messages API 要求 `max_tokens`；通过 `GenerationConfig.max_output_tokens` 或 provider-native `provider_options["max_tokens"]` 提供。
+  - user-executed function tools。
+  - `tool_use` -> `FunctionCallItem`。
+  - `FunctionResultItem` -> `tool_result`，不映射 `is_error`。
+  - `ReasoningConfig.mode enabled/auto` -> `thinking={"type": "enabled"}`。
+  - `ReasoningConfig.mode disabled/none` -> `thinking={"type": "disabled"}`。
+  - `ReasoningConfig.effort high/max` -> `output_config.effort`。
+  - provider-native content block snapshot 与 same-provider replay。
+  - usage/cache token mapping。
+- Messages streaming：
+  - message lifecycle、text delta、tool input JSON delta、thinking delta、usage update、completed/error 与 unknown passthrough。
+- Cache hint 兼容：
+  - `RemoteContextHint.enable_cache=True` 兼容接收但不下发 `cache_control`。
+  - `new_items_start_index` 兼容接收但忽略。
+  - 不做 response-style previous response 差分传输。
+  - 显式 `cache_control` 会抛 `UnsupportedCapabilityError`。
+- Capability：
+  - adapter capability 声明 generation/streaming/async/function tools/reasoning/usage。
+  - input modality 为 text-only。
+  - structured output、remote context transport、embedding、Files API、media generation、custom tools、parallel tool call control 均声明不支持。
+  - supported reasoning efforts 为 `("high", "max")`。
   - model capability 默认 unknown，支持用户 overrides。
 
 ## 暂不实现
@@ -228,7 +272,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - 自动工具执行。
 - 内建 ReAct/agent loop。
 - 内部权威模型能力表。
-- 对同时支持 Responses API 与 Chat Completions API 的 provider 维护双 generation 调用面。
+- 对同时支持多个兼容 API 的 provider 维护双 generation 调用面；DeepSeek `openai_completion` 兼容形态暂未实现。
 - 隐式本地文件自动上传。
 - Provider-hosted tool、remote tool、MCP tool 的通用 core 抽象。
 - Provider conversation 持久化上下文抽象。
@@ -250,7 +294,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - Capability 中无法可靠获取的 model 字段应表达为 unknown。
 - Reasoning 与 parallel tool calls 是通用 generation 配置，不应作为 OpenAI 专有参数处理。
 - 不同 provider 的 reasoning effort 取值不同，应通过 capability 字段声明支持集合。
-- 同时支持 Responses API 与 Chat Completions API 的 provider，Python generation adapter 仅使用 Responses API。
+- 同时支持多个兼容 API family 的 provider，应在 provider-specific adapter 中明确当前实现的 transport；DeepSeek 当前仅实现 Anthropic-compatible Messages API。
 - Provider-side state/cache/previous response 只能作为优化 hint，不改变 Full-context First。
 - `RemoteContextHint` 表达 `enable_cache` 与 `new_items_start_index`，不让用户直接传入 provider response id。
 - Full-context First 要求用户传入完整 `items`，但 provider 请求层可以在新增边界明确且 anchor response id 可用时只传追加 suffix。
@@ -263,4 +307,4 @@ cd python
 ../.venv/bin/python -m pytest
 ```
 
-当前 v0.6 基线：`190 passed, 10 skipped`；Anthropic structured output 相关单测为 `21 passed`。
+当前 v0.7 基线：`214 passed, 11 skipped`。

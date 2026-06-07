@@ -1,12 +1,12 @@
 # Python API 参考
 
-状态：v0.6
+状态：v0.7
 日期：2026-05-13
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.6 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine / Anthropic adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Anthropic provider 用法见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.7 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Anthropic provider 用法见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)；DeepSeek provider 用法见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 
@@ -29,6 +29,7 @@ Provider client 从各 provider 包导入：
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
 from whero.vatbrain.providers.anthropic import AnthropicClient
+from whero.vatbrain.providers.deepseek import DeepSeekClient
 ```
 
 Pydantic structured output helper 从 `whero.vatbrain.structured` 导入：
@@ -65,7 +66,7 @@ config = ClientConfig(
 
 ### OpenAIClient
 
-当前已实现 provider：OpenAI、Volcengine、Anthropic。
+当前已实现 provider：OpenAI、Volcengine、Anthropic、DeepSeek。
 
 ```python
 from whero.vatbrain.providers.openai import OpenAIClient
@@ -213,9 +214,55 @@ Anthropic client 方法：
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
-Anthropic adapter 支持文本、图片理解、JSON Schema structured output、Pydantic structured output helper、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
+Anthropic adapter 支持文本、图片理解、JSON Schema structured output、Pydantic structured output helper、ReasoningConfig extended thinking、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
 
-Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner 或 `ReasoningConfig` 请求映射。`ResponseFormat` 会映射为 Anthropic Messages API `output_config.format` JSON Schema。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
+Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ReasoningConfig.include_trace` 或 `reasoning.provider_options`。`ResponseFormat` 会映射为 Anthropic Messages API `output_config.format` JSON Schema。`ReasoningConfig` 会映射为 Anthropic `thinking` 与 `output_config.effort`。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
+
+### DeepSeekClient
+
+DeepSeek provider 当前使用 DeepSeek Anthropic-compatible Messages API，底层复用 Anthropic Python SDK。
+
+```python
+from whero.vatbrain.providers.deepseek import DeepSeekClient
+
+client = DeepSeekClient(api_key="...")
+```
+
+安装 extra：
+
+```bash
+cd python
+../.venv/bin/python -m pip install -e ".[deepseek]"
+```
+
+DeepSeek API key 必须在初始化时显式传入，或通过 `ClientConfig(api_key=...)` 提供：
+
+```python
+client = DeepSeekClient(api_key="...", base_url="...", timeout=30.0)
+```
+
+初始化参数：
+
+- `config`：`ClientConfig`。
+- `api_key`、`base_url`、`timeout`、`max_retries`：覆盖 `config` 中的同名字段。
+- `api_format`：当前支持 `"anthropic"`；`"openai_completion"` 为预留值，初始化时抛 `ValueError`。
+- `client`：注入已有同步 Anthropic SDK client，常用于测试或复用连接。
+- `async_client`：注入已有异步 Anthropic SDK client。
+- `model_capability_overrides`：用户侧模型能力覆写。
+- `**deepseek_client_options`：透传给 Anthropic SDK client 的初始化参数；其中已知 secret 字段会以 `SecretString` 保存。
+
+DeepSeek client 方法：
+
+- `generate(...) -> GenerationResponse`
+- `agenerate(...) -> GenerationResponse`
+- `stream_generate(...) -> Iterator[GenerationStreamEvent]`
+- `astream_generate(...) -> AsyncIterator[GenerationStreamEvent]`
+- `get_adapter_capability() -> AdapterCapability`
+- `get_model_capability(model, overrides=None) -> ModelCapability`
+
+DeepSeek adapter 支持文本生成、streaming、async、function tools、`ReasoningConfig.mode` / `ReasoningConfig.effort` 和 usage 映射。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic-compatible 原生参数。
+
+DeepSeek adapter 不支持 image/document/file/audio/video input、structured output、Pydantic parsed convenience、Files API、embedding、media generation、custom tools、explicit `cache_control` 或可靠禁用 parallel tool calls。`RemoteContextHint.enable_cache=True` 会被兼容接收但不下发 cache control；`new_items_start_index` 会被忽略，不触发差分传输。
 
 ## Items
 
@@ -499,7 +546,7 @@ reasoning = ReasoningConfig(
 )
 ```
 
-不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。Volcengine adapter 将 `mode` 映射为 Ark `thinking.type`，将 `effort` 映射为 `reasoning.effort`。Anthropic adapter 暂不支持 `ReasoningConfig` 请求映射；传入该配置会抛 `UnsupportedCapabilityError`。Provider 返回的 thinking content block 会尽量映射为 `ReasoningItem`。
+不同 provider 对 `effort` 的取值和语义可能不同。支持的 effort 应通过 capability 查询。Volcengine adapter 将 `mode` 映射为 Ark `thinking.type`，将 `effort` 映射为 `reasoning.effort`。DeepSeek adapter 将 `mode="enabled"/"auto"` 映射为 `thinking={"type": "enabled"}`，将 `mode="disabled"/"none"` 映射为 `thinking={"type": "disabled"}`，将 `effort="high"/"max"` 映射为 `output_config.effort`。Anthropic adapter 将 `mode="disabled"/"none"` 映射为 `thinking={"type": "disabled"}`，将 `budget_tokens` 映射为 manual `thinking={"type": "enabled", "budget_tokens": ...}`，将 `mode="auto"/"enabled"/"adaptive"` 映射为 `thinking={"type": "adaptive"}`，并将 `effort` 映射为 `output_config.effort`。Anthropic adapter 暂不支持 `include_trace` 或 `reasoning.provider_options`。Provider 返回的 thinking content block 会尽量映射为 `ReasoningItem`。
 
 ### ToolCallConfig
 
@@ -533,7 +580,7 @@ remote_context = RemoteContextHint(
 - `new_items_start_index`：完整 `items` 中新增 item 的起始 index。
 - `provider_options`：provider-specific remote context 参数。
 
-用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching。
+用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching。DeepSeek adapter 兼容接收 `RemoteContextHint`，但不下发 `cache_control`，也不做差分传输。
 
 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应在目标服务上验证 `previous_response_id` / stored response 链接能力后再使用 `new_items_start_index`。未验证前可以只设置 `enable_cache=True` 或完全不传 `remote_context`，由 adapter 发送完整 `items`；这样不会改变对话语义，只是不会获得 response-id 差分传输优化。
 
@@ -748,6 +795,8 @@ parsed = client.generate_parsed(
 `generate_parsed()` / `agenerate_parsed()` 使用默认 Pydantic helper 行为；如需自定义 schema name、description 或 strict，请显式使用 `pydantic_output()` + `generate()`。
 
 Anthropic adapter 不调用 Anthropic SDK `messages.parse()`；它会把 `ResponseFormat` 映射为 `output_config.format`，最终仍由 `pydantic_output()` 解析 assistant text。Anthropic JSON outputs 与 assistant message prefill 不兼容；请求携带 `ResponseFormat` 时最后一条消息不能是 assistant prefill。
+
+DeepSeek adapter 当前不支持 `ResponseFormat`，也不提供 `generate_parsed()` / `agenerate_parsed()`。
 
 ## Embedding
 
@@ -1376,6 +1425,11 @@ from whero.vatbrain.core.errors import (
 - `FunctionResultItem` -> `tool_result`。
 - JSON Schema structured output。
 - Pydantic structured output helper。
+- `ReasoningConfig` 请求映射：
+  - `mode disabled/none` -> `thinking={"type": "disabled"}`。
+  - `budget_tokens` -> `thinking={"type": "enabled", "budget_tokens": ...}`。
+  - `mode auto/enabled/adaptive` -> `thinking={"type": "adaptive"}`。
+  - `effort low/medium/high/max/xhigh` -> `output_config.effort`。
 - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
 - `new_items_start_index` 兼容接收但忽略。
 - provider-native content block snapshot replay。
@@ -1389,11 +1443,54 @@ from whero.vatbrain.core.errors import (
 - media generation。
 - previous response 差分传输。
 - response-style remote context refresh。
-- `ReasoningConfig` 请求映射。
+- `ReasoningConfig.include_trace` 或 `reasoning.provider_options`。
 - `FunctionToolType.CUSTOM`。
 - 显式 Anthropic `cache_control`。
 - 显式 Anthropic `output_config` / 旧 beta `output_format`。
 - structured output 与 assistant message prefill 同用。
+- provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
+- provider conversation 持久化上下文抽象。
+- 跨 provider replay。
+
+## DeepSeek Adapter 支持范围
+
+当前 DeepSeek adapter 支持：
+
+- DeepSeek Anthropic-compatible Messages API 调用路径。
+- `api_format="anthropic"`。
+- 默认 base URL：`https://api.deepseek.com/anthropic`。
+- Messages API generation。
+- Messages API streaming。
+- async generation / streaming。
+- text-only input。
+- initial system/developer instruction prefix 映射为 top-level `system`。
+- user function tool。
+- `tool_use` -> `FunctionCallItem`。
+- `FunctionResultItem` -> `tool_result`。
+- `ReasoningConfig.mode enabled/auto` -> `thinking={"type": "enabled"}`。
+- `ReasoningConfig.mode disabled/none` -> `thinking={"type": "disabled"}`。
+- `ReasoningConfig.effort high/max` -> `output_config.effort`。
+- `RemoteContextHint.enable_cache=True` 兼容接收但不下发 cache control。
+- `new_items_start_index` 兼容接收但忽略。
+- provider-native content block snapshot replay。
+- usage cache token mapping。
+- adapter/model capability 查询与用户覆写。
+
+当前 DeepSeek adapter 不支持：
+
+- `api_format="openai_completion"`。
+- image/document/file/audio/video input。
+- Files API。
+- embedding。
+- media generation。
+- previous response 差分传输。
+- response-style remote context refresh。
+- `ResponseFormat` structured output。
+- Pydantic parsed convenience。
+- `FunctionToolType.CUSTOM`。
+- 显式 Anthropic `cache_control`。
+- 显式 `output_format` / `output_config.format`。
+- 可靠禁用 parallel tool calls。
 - provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
 - provider conversation 持久化上下文抽象。
 - 跨 provider replay。

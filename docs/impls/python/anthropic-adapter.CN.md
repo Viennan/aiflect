@@ -6,7 +6,7 @@
 
 ## 定位
 
-本文记录 Python 参考实现新增 Anthropic provider adapter 的实现方案。需求状态见 [REQ-2026-06-python-anthropic-adapter.CN.md](../../requirements/REQ-2026-06-python-anthropic-adapter.CN.md)，高层设计见 [anthropic-provider-support.CN.md](../../design/anthropic-provider-support.CN.md)。
+本文记录 Python 参考实现新增 Anthropic provider adapter 的实现方案。需求状态见 [REQ-2026-06-python-anthropic-adapter.CN.md](../../requirements/REQ-2026-06-python-anthropic-adapter.CN.md)、[REQ-2026-06-python-anthropic-structured-output.CN.md](../../requirements/REQ-2026-06-python-anthropic-structured-output.CN.md) 与 [REQ-2026-06-python-anthropic-reasoning.CN.md](../../requirements/REQ-2026-06-python-anthropic-reasoning.CN.md)，高层设计见 [anthropic-provider-support.CN.md](../../design/anthropic-provider-support.CN.md)。
 
 Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthropic Python SDK 的 Messages API，不实现 Files API、embedding 或 media generation。
 
@@ -19,6 +19,7 @@ Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthrop
 - `to_anthropic_generation_params()` 与 `from_anthropic_generation_response()`。
 - `from_anthropic_stream_event()`。
 - `ResponseFormat` structured output 请求映射。
+- `ReasoningConfig` extended thinking 请求映射。
 - `generate_parsed()` / `agenerate_parsed()`。
 - Anthropic adapter/model capability。
 - 单元测试覆盖 mapper、stream、client 和 capability。
@@ -26,7 +27,7 @@ Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthrop
 实现决策：
 
 - `ResponseFormat` 映射为 Anthropic Messages API `output_config.format` JSON Schema，不调用 Anthropic SDK `messages.parse()`。
-- `ReasoningConfig` 请求映射暂不支持，遇到即抛 `UnsupportedCapabilityError`。
+- `ReasoningConfig` 映射为 Anthropic Messages API `thinking` 与 `output_config.effort`；`output_config` 由 adapter 合并 structured output format 与 reasoning effort。
 - `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
 - `new_items_start_index` 兼容接收但忽略，不做差分传输。
 - 用户显式传入 `cache_control` 会被拒绝，避免形成 explicit cache control 隐式入口。
@@ -241,7 +242,32 @@ mapper 需要把连续的 tool result 与后续 user text 组织为同一个 use
 
 ### Reasoning 与 Structured Output
 
-当前实现仍不支持 `ReasoningConfig` 请求映射，遇到即抛 `UnsupportedCapabilityError`。Provider 返回的 `thinking` / `redacted_thinking` content block 会尽量映射为 `ReasoningItem`。
+`ReasoningConfig` 支持 Anthropic extended thinking 请求映射。Provider 返回的 `thinking` / `redacted_thinking` content block 会尽量映射为 `ReasoningItem`。
+
+请求映射：
+
+```text
+ReasoningConfig(mode="disabled"|"none")
+  -> thinking={"type": "disabled"}
+
+ReasoningConfig(budget_tokens=1024)
+  -> thinking={"type": "enabled", "budget_tokens": 1024}
+
+ReasoningConfig(mode="auto"|"enabled"|"adaptive")
+  -> thinking={"type": "adaptive"}
+
+ReasoningConfig(effort="high")
+  -> output_config.effort = "high"
+```
+
+`summary="auto"` / `"summarized"` 映射为 `thinking.display="summarized"`；`summary="none"` / `"omitted"` 映射为 `thinking.display="omitted"`。`include_trace` 与 `reasoning.provider_options` 暂不支持。
+
+校验规则：
+
+- active thinking 与 assistant message prefill 不兼容。
+- active thinking 与 `temperature`、`top_k` 和 forced `tool_choice` 不兼容。
+- active thinking 下 `top_p` 如显式设置，必须在 `0.95` 到 `1.0` 之间。
+- manual `budget_tokens` 必须为整数、至少 1024，且小于最终 `max_tokens`。
 
 `ResponseFormat` 支持 JSON Schema structured output，并映射为 Anthropic Messages API 的 GA 形态：
 
@@ -259,6 +285,17 @@ output_config.format.type = "json_schema"
             "type": "json_schema",
             "schema": response_format.json_schema,
         }
+    }
+}
+```
+
+当请求同时携带 `ResponseFormat` 与 `ReasoningConfig.effort` 时，adapter 合并为同一个 `output_config`：
+
+```python
+{
+    "output_config": {
+        "format": {"type": "json_schema", "schema": response_format.json_schema},
+        "effort": "high",
     }
 }
 ```
@@ -408,12 +445,16 @@ streaming=True
 input_modalities=("text", "image")
 output_modalities=("text",)
 structured_output=True
-reasoning_config=False
+reasoning_config=True
+supported_reasoning_efforts=("low", "medium", "high", "max", "xhigh")
 reasoning_output=True
 remote_context=True
 function_tools=True
 metadata["remote_context_semantics"] =
   "enable_cache maps to automatic prompt caching; new_items_start_index ignored; no transport delta"
+metadata["reasoning_transport"] = "thinking"
+metadata["reasoning_effort_transport"] = "output_config.effort"
+metadata["reasoning_manual_budget_model_dependent"] = True
 metadata["structured_output_transport"] = "output_config.format"
 metadata["structured_output_parse_helper"] = "pydantic_output"
 metadata["structured_output_message_prefill_compatible"] = False
@@ -488,6 +529,7 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 
 - real text generation。
 - real image understanding。
+- real reasoning generation；reasoning 开启时 `max_output_tokens` 使用 2048。
 - real tool use。
 - real automatic prompt caching usage observation。
 
@@ -500,7 +542,8 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 5. 已实现 `client.py` sync/async generation。
 6. 已实现 `stream.py` 与 stream client。
 7. 已实现 `generate_parsed()` / `agenerate_parsed()`。
-8. 已添加单元测试。
+8. 已新增 Anthropic `ReasoningConfig` 请求映射、usage reasoning token 映射与 capability。
+9. 已添加单元测试。
 9. 已同步 [STATUS.md](STATUS.md)、用户 quickstart/API reference 和总索引。
 
 ## FAQ
@@ -529,6 +572,8 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 - Anthropic Messages API：https://docs.anthropic.com/en/api/messages
 - Anthropic Python SDK：https://docs.anthropic.com/en/api/sdks/python
 - Anthropic structured outputs：https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs
+- Anthropic extended thinking：https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+- Anthropic effort：https://platform.claude.com/docs/en/build-with-claude/effort
 - Anthropic prompt caching：https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
 - Anthropic streaming：https://docs.anthropic.com/en/docs/build-with-claude/streaming
 - Anthropic tool use：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview

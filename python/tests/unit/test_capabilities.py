@@ -5,6 +5,7 @@ import pytest
 from whero.vatbrain import CapabilitySource
 from whero.vatbrain.core.capabilities import CapabilityValue, GenerationCapability
 from whero.vatbrain.providers.anthropic import AnthropicClient
+from whero.vatbrain.providers.deepseek import DeepSeekClient
 from whero.vatbrain.providers.openai import OpenAIClient
 from whero.vatbrain.providers.volcengine import VolcengineClient
 
@@ -77,12 +78,50 @@ def test_anthropic_adapter_capability_declares_generation_only_surface() -> None
     assert capability.generation is not None
     assert capability.generation.input_modalities.value == ("text", "image")
     assert capability.generation.structured_output.value is True
+    assert capability.generation.reasoning_config.value is True
+    assert capability.generation.supported_reasoning_efforts.value == (
+        "low",
+        "medium",
+        "high",
+        "max",
+        "xhigh",
+    )
     assert capability.generation.remote_context.value is True
+    assert capability.generation.metadata["reasoning_transport"] == "thinking"
+    assert capability.generation.metadata["reasoning_effort_transport"] == "output_config.effort"
     assert capability.generation.metadata["structured_output_transport"] == "output_config.format"
     assert capability.generation.metadata["remote_context_semantics"].startswith("enable_cache maps")
     assert capability.tools is not None
     assert capability.tools.user_function_tools.value is True
     assert capability.tools.custom_tools.value is False
+
+
+def test_deepseek_adapter_capability_declares_anthropic_compatible_surface() -> None:
+    client = DeepSeekClient(client=object(), async_client=object())
+
+    capability = client.get_adapter_capability()
+
+    assert capability.provider == "deepseek"
+    assert capability.supports_generation is True
+    assert capability.supports_stream_generation is True
+    assert capability.supports_async is True
+    assert capability.supports_text_embedding is False
+    assert capability.supports_multimodal_embedding is False
+    assert capability.supports_function_tools is True
+    assert capability.generation is not None
+    assert capability.generation.input_modalities.value == ("text",)
+    assert capability.generation.output_modalities.value == ("text",)
+    assert capability.generation.structured_output.value is False
+    assert capability.generation.reasoning_config.value is True
+    assert capability.generation.supported_reasoning_efforts.value == ("high", "max")
+    assert capability.generation.remote_context.value is False
+    assert capability.generation.metadata["api_family"] == "anthropic_messages"
+    assert capability.generation.metadata["reasoning_effort_transport"] == "output_config.effort"
+    assert capability.tools is not None
+    assert capability.tools.user_function_tools.value is True
+    assert capability.tools.custom_tools.value is False
+    assert capability.tools.parallel_tool_calls.value is False
+    assert capability.metadata["implemented_api_formats"] == ("anthropic",)
 
 
 def test_model_capability_defaults_to_unknown_and_accepts_overrides() -> None:

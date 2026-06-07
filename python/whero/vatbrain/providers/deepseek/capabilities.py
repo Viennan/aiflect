@@ -1,4 +1,4 @@
-"""Anthropic adapter capability declarations."""
+"""DeepSeek adapter capability declarations."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ from whero.vatbrain.core.capabilities import (
     ToolCapability,
 )
 
-PROVIDER = "anthropic"
+PROVIDER = "deepseek"
 
 
 def get_adapter_capability() -> AdapterCapability:
-    """Return capabilities implemented by this adapter, independent of model choice."""
+    """Return capabilities implemented by this adapter in Anthropic-compatible mode."""
 
     return AdapterCapability(
         provider=PROVIDER,
@@ -31,34 +31,29 @@ def get_adapter_capability() -> AdapterCapability:
         generation=GenerationCapability(
             supported=CapabilityValue.adapter_builtin(True),
             streaming=CapabilityValue.adapter_builtin(True),
-            input_modalities=CapabilityValue.adapter_builtin(("text", "image")),
+            input_modalities=CapabilityValue.adapter_builtin(("text",)),
             output_modalities=CapabilityValue.adapter_builtin(("text",)),
-            structured_output=CapabilityValue.adapter_builtin(True),
+            structured_output=CapabilityValue.adapter_builtin(False),
             reasoning_config=CapabilityValue.adapter_builtin(True),
-            supported_reasoning_efforts=CapabilityValue.adapter_builtin(
-                ("low", "medium", "high", "max", "xhigh")
-            ),
+            supported_reasoning_efforts=CapabilityValue.adapter_builtin(("high", "max")),
             reasoning_output=CapabilityValue.adapter_builtin(True),
-            remote_context=CapabilityValue.adapter_builtin(True),
+            remote_context=CapabilityValue.adapter_builtin(False),
             function_tools=CapabilityValue.adapter_builtin(True),
             metadata={
-                "api_family": "messages",
-                "reasoning_transport": "thinking",
+                "api_family": "anthropic_messages",
+                "api_format": "anthropic",
+                "default_base_url": "https://api.deepseek.com/anthropic",
+                "structured_output": "unsupported by DeepSeek Anthropic-compatible endpoint",
                 "reasoning_effort_transport": "output_config.effort",
-                "reasoning_manual_budget_model_dependent": True,
-                "structured_output_transport": "output_config.format",
-                "structured_output_parse_helper": "pydantic_output",
-                "structured_output_message_prefill_compatible": False,
                 "remote_context_semantics": (
-                    "enable_cache maps to Anthropic automatic prompt caching; "
-                    "new_items_start_index is ignored; no transport delta"
+                    "DeepSeek ignores Anthropic cache_control; no remote context transport"
                 ),
             },
         ),
         tools=ToolCapability(
             user_function_tools=CapabilityValue.adapter_builtin(True),
             custom_tools=CapabilityValue.adapter_builtin(False),
-            parallel_tool_calls=CapabilityValue.adapter_builtin(True),
+            parallel_tool_calls=CapabilityValue.adapter_builtin(False),
             tool_choice=CapabilityValue.adapter_builtin(True),
         ),
         metadata={
@@ -66,6 +61,8 @@ def get_adapter_capability() -> AdapterCapability:
             "embedding": False,
             "media_generation": False,
             "explicit_cache_control": False,
+            "api_formats": ("anthropic", "openai_completion"),
+            "implemented_api_formats": ("anthropic",),
         },
     )
 

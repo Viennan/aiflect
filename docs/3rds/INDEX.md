@@ -1,7 +1,11 @@
 # 第三方资料索引
 
 状态：持续维护  
-最近更新：2026-05-14
+最近更新：2026-06-07
+
+## DeepSeek
+
+- [deepseek/INDEX.md](deepseek/INDEX.md)：DeepSeek 第三方资料索引，记录 Anthropic 兼容接口的 base URL、Messages API 支持范围、reasoning、工具、cache control、structured output 和多模态限制。
 
 ## Volcengine
 

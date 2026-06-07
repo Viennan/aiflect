@@ -8,7 +8,7 @@
 
 本文说明 Python 版 `vatbrain` 的 Anthropic provider 用法。完整 API 字段见 [api-reference.CN.md](api-reference.CN.md)，实现边界见 [anthropic-adapter.CN.md](../../impls/python/anthropic-adapter.CN.md)。
 
-Anthropic adapter 使用官方 Anthropic Python SDK 的 Messages API。它支持文本生成、图片理解、JSON Schema structured output、同步/异步、streaming、user-executed function tools 和 automatic prefix caching；不支持 Anthropic Files API、embedding、media generation、provider-hosted/server tools 或 SDK Tool Runner 自动工具循环。
+Anthropic adapter 使用官方 Anthropic Python SDK 的 Messages API。它支持文本生成、图片理解、JSON Schema structured output、ReasoningConfig extended thinking、同步/异步、streaming、user-executed function tools 和 automatic prefix caching；不支持 Anthropic Files API、embedding、media generation、provider-hosted/server tools 或 SDK Tool Runner 自动工具循环。
 
 ## 安装与环境
 
@@ -177,6 +177,35 @@ contact = parsed.output_parsed
 
 如果需要自定义 schema name、description 或 strict 行为，使用 `pydantic_output()` + `generate()`。Anthropic JSON outputs 与 assistant message prefill 不兼容；请求携带 `ResponseFormat` 时，最后一条消息不能是 assistant prefill。用户也不能通过 `provider_options` 显式传入 Anthropic `output_config` 或旧 beta `output_format`。
 
+## Reasoning
+
+Anthropic adapter 支持 `ReasoningConfig`，并映射为 Anthropic Messages API 的 extended thinking 参数：
+
+```python
+from whero.vatbrain import GenerationConfig, MessageItem, ReasoningConfig
+
+response = client.generate(
+    model="claude-sonnet-4-5",
+    items=[MessageItem.user("Think through the tradeoffs, then answer briefly.")],
+    generation_config=GenerationConfig(max_output_tokens=2048),
+    reasoning=ReasoningConfig(
+        mode="auto",
+        effort="high",
+        summary="omitted",
+    ),
+)
+```
+
+映射规则：
+
+- `mode="disabled"` 或 `"none"` -> `thinking={"type": "disabled"}`。
+- `budget_tokens=...` -> `thinking={"type": "enabled", "budget_tokens": ...}`。
+- `mode="auto"`、`"enabled"` 或 `"adaptive"` -> `thinking={"type": "adaptive"}`。
+- `effort` -> `output_config.effort`，当前 adapter 接收 `low`、`medium`、`high`、`max`、`xhigh`。
+- `summary="auto"` / `"summarized"` -> `display="summarized"`；`summary="none"` / `"omitted"` -> `display="omitted"`。
+
+开启 reasoning 时通常需要更大的 `max_output_tokens`；costly smoke 使用 2048 作为基线。Active thinking 与 assistant message prefill、`temperature`、`top_k` 和 forced tool choice 不兼容；manual `budget_tokens` 必须小于 `max_tokens`。不同模型对 manual budget 和 effort 值的支持可能不同，必要时通过 `model_capability_overrides` 补充模型能力。
+
 ## Function Tools
 
 Anthropic adapter 支持 user-executed function tools。`vatbrain` 不自动执行工具；模型返回 `FunctionCallItem` 后，由用户代码执行工具，并在下一轮完整上下文中加入 `FunctionResultItem`。
@@ -238,6 +267,7 @@ assert capability.supports_generation is True
 assert capability.supports_text_embedding is False
 assert capability.generation.input_modalities.value == ("text", "image")
 assert capability.generation.structured_output.value is True
+assert capability.generation.reasoning_config.value is True
 ```
 
 Anthropic model capability 默认 unknown，可通过 `model_capability_overrides` 或 `get_model_capability(..., overrides=...)` 由用户补充。
@@ -248,7 +278,7 @@ Anthropic model capability 默认 unknown，可通过 `model_capability_override
 - 不支持 embedding。
 - 不支持 media generation。
 - 不支持 provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
-- 暂不支持 `ReasoningConfig` 请求映射；provider 返回的 thinking content block 会尽量映射为 `ReasoningItem`。
+- 不支持 `ReasoningConfig.include_trace` 或 `reasoning.provider_options`。
 - 不支持 response-style previous response 差分传输，也没有 response-style remote context refresh。
 - 不支持 structured output 与 assistant message prefill 同用。
 

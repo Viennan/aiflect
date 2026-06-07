@@ -1,7 +1,7 @@
 # Python 用户文档状态
 
-状态：v0.6 已系统化整理
-日期：2026-05-05
+状态：v0.7 Anthropic reasoning 与 DeepSeek provider 文档已补充
+日期：2026-06-07
 最近更新：2026-06-07
 
 ## 当前文档
@@ -9,7 +9,8 @@
 - [quickstart.CN.md](quickstart.CN.md)：渐进式用户指南，从安装、client 初始化、generation、remote context/replay、streaming、图片/视频生成、structured output、tools、embedding、capability 到错误处理。
 - [api-reference.CN.md](api-reference.CN.md)：Python public API 参考，覆盖当前暴露给用户的 core dataclass、enum、provider client、media generation、Pydantic helper、capability、usage 与错误类型。
 - [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)：Volcengine / 火山方舟 provider 快速开始，覆盖 Ark SDK-only 安装、generation、streaming、图片生成、视频任务、Files API、多模态 embedding、function tools、remote context 与限制。
-- [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)：Anthropic provider 快速开始，覆盖官方 Anthropic SDK Messages API 安装、generation、图片理解、JSON Schema structured output、automatic prefix caching、streaming、function tools、capability 与限制。
+- [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)：Anthropic provider 快速开始，覆盖官方 Anthropic SDK Messages API 安装、generation、图片理解、JSON Schema structured output、ReasoningConfig、automatic prefix caching、streaming、function tools、capability 与限制。
+- [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)：DeepSeek provider 快速开始，覆盖 Anthropic-compatible endpoint 安装、`api_format`、文本生成、streaming、reasoning、function tools、cache hint 兼容、capability 与限制。
 - [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)：Pydantic structured output 编程模型，说明 helper、默认 schema 行为、strict schema、解析与错误处理。
 
 ## 已覆盖
@@ -44,10 +45,26 @@
   - 同步/异步 generation 与 streaming。
   - text/image input。
   - JSON Schema structured output。
+  - `ReasoningConfig.mode/budget_tokens -> thinking`。
+  - `ReasoningConfig.effort -> output_config.effort`。
   - `generate_parsed()` / `agenerate_parsed()`。
   - user-executed function tools。
   - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
   - `new_items_start_index` 兼容接收但忽略，不做差分传输。
+  - usage cache/reasoning token 映射。
+  - capability 查询。
+- DeepSeek provider client：
+  - `whero-vatbrain[deepseek]` optional dependency。
+  - 显式凭据初始化与 SecretString 存储。
+  - Anthropic-compatible Messages API 调用边界。
+  - `api_format="anthropic"` 已实现，`api_format="openai_completion"` 预留但未实现。
+  - 默认 base URL 为 `https://api.deepseek.com/anthropic`，仍保留可覆盖的 `base_url`。
+  - 同步/异步 generation 与 streaming。
+  - text-only input。
+  - `ReasoningConfig.mode -> thinking`。
+  - `ReasoningConfig.effort -> output_config.effort`，支持 `high` / `max`。
+  - user-executed function tools。
+  - `RemoteContextHint.enable_cache=True` 兼容接收但不下发 `cache_control`。
   - usage cache token 映射。
   - capability 查询。
 - Generation：
@@ -93,10 +110,11 @@
   - `VideoGenerationRequest`。
   - usage、capability、errors。
 - 限制：
-  - 已实现 OpenAI、Volcengine 与 Anthropic provider。
+  - 已实现 OpenAI、Volcengine、Anthropic 与 DeepSeek provider。
   - OpenAI 文本 generation 仅 Responses API。
   - Volcengine 文本 generation 仅 Ark SDK Responses API，不使用 OpenAI-compatible surface。
-  - Anthropic 文本 generation 仅官方 Anthropic SDK Messages API；不支持 Files API、embedding、media generation 和 `ReasoningConfig` 请求映射。
+  - Anthropic 文本 generation 仅官方 Anthropic SDK Messages API；不支持 Files API、embedding 或 media generation。
+  - DeepSeek 文本 generation 当前仅 Anthropic-compatible Messages API；不支持 OpenAI completion 兼容形态、structured output、图片/文件/音频/视频输入、Files API、embedding 或 media generation。
   - OpenAI 图片生成仅直接使用 Images API，不使用 Responses API hosted image generation tool。
   - Volcengine 图片/视频生成仅使用 Ark SDK 原生 Images API 与 Content Generation tasks。
   - 不自动工具执行。

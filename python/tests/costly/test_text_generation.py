@@ -22,6 +22,7 @@ from whero.vatbrain.core.generation import StreamEventType
 pytestmark = pytest.mark.costly
 _CACHE_MARKER = "VATBRAIN-CACHE-42"
 _STRUCTURED_CODE = "ALPHA42"
+_REASONING_MAX_OUTPUT_TOKENS = 2048
 
 
 class StructuredAnswer(BaseModel):
@@ -33,6 +34,7 @@ class StructuredAnswer(BaseModel):
 @pytest.mark.provider("openai")
 @pytest.mark.provider("volcengine")
 @pytest.mark.provider("anthropic")
+@pytest.mark.provider("deepseek")
 @pytest.mark.feature("generation")
 def test_costly_text_generation_response(costly_client: Any, costly_model_case: Any) -> None:
     _require_text_to_text_generation(costly_model_case)
@@ -61,6 +63,7 @@ def test_costly_text_generation_response(costly_client: Any, costly_model_case: 
 @pytest.mark.provider("openai")
 @pytest.mark.provider("volcengine")
 @pytest.mark.provider("anthropic")
+@pytest.mark.provider("deepseek")
 @pytest.mark.feature("generation")
 def test_costly_text_generation_stream(costly_client: Any, costly_model_case: Any) -> None:
     _require_text_to_text_generation(costly_model_case)
@@ -109,6 +112,7 @@ def test_costly_text_generation_stream(costly_client: Any, costly_model_case: An
 @pytest.mark.provider("openai")
 @pytest.mark.provider("volcengine")
 @pytest.mark.provider("anthropic")
+@pytest.mark.provider("deepseek")
 @pytest.mark.feature("generation")
 def test_costly_image_to_text_generation(
     costly_client: Any,
@@ -151,6 +155,7 @@ def test_costly_image_to_text_generation(
 @pytest.mark.provider("openai")
 @pytest.mark.provider("volcengine")
 @pytest.mark.provider("anthropic")
+@pytest.mark.provider("deepseek")
 @pytest.mark.feature("generation")
 def test_costly_structured_output_generation(costly_client: Any, costly_model_case: Any) -> None:
     _require_structured_output_generation(costly_model_case)
@@ -179,6 +184,42 @@ def test_costly_structured_output_generation(costly_client: Any, costly_model_ca
     assert parsed.output_parsed.code == _STRUCTURED_CODE
     assert parsed.output_parsed.count == 3
     assert parsed.output_parsed.status.lower() == "ok"
+
+
+@pytest.mark.provider("anthropic")
+@pytest.mark.feature("generation")
+def test_costly_anthropic_reasoning_generation(
+    costly_client: Any,
+    costly_model_case: Any,
+) -> None:
+    _require_text_to_text_generation(costly_model_case)
+    if not costly_model_case.supports("supports_reasoning_config"):
+        pytest.skip("model does not declare reasoning config support")
+
+    response = _generate_or_skip_provider_unavailable(
+        costly_client,
+        model=costly_model_case.model_id,
+        items=[
+            MessageItem.system("Answer briefly in plain text."),
+            MessageItem.user(
+                "Use reasoning if helpful, then reply with one short sentence "
+                "that includes the word VATBRAIN."
+            ),
+        ],
+        generation_config=GenerationConfig(max_output_tokens=_REASONING_MAX_OUTPUT_TOKENS),
+        reasoning=ReasoningConfig(
+            mode="auto",
+            effort=_reasoning_effort_for(costly_model_case),
+            summary="omitted",
+        ),
+    )
+
+    assert response.provider == "anthropic"
+    text = _response_text(response)
+    assert text.strip()
+    assert "vatbrain" in text.lower()
+    if response.usage is not None and response.usage.reasoning_tokens is not None:
+        assert response.usage.reasoning_tokens >= 0
 
 
 @pytest.mark.provider("volcengine")
@@ -261,6 +302,23 @@ def _reasoning_for(costly_model_case: Any) -> ReasoningConfig | None:
         and costly_model_case.supports("supports_reasoning_config")
     ):
         return ReasoningConfig(mode="disabled")
+    if (
+        costly_model_case.provider == "deepseek"
+        and costly_model_case.supports("supports_reasoning_config")
+    ):
+        # Keep text smoke tests focused on text; some DeepSeek models spend small
+        # max_tokens budgets on thinking unless it is explicitly disabled.
+        return ReasoningConfig(mode="disabled")
+    return None
+
+
+def _reasoning_effort_for(costly_model_case: Any) -> str | None:
+    efforts = costly_model_case.capabilities.get("supported_reasoning_efforts")
+    if not isinstance(efforts, (list, tuple, set)):
+        return None
+    for effort in ("low", "medium", "high", "max", "xhigh"):
+        if effort in efforts:
+            return effort
     return None
 
 

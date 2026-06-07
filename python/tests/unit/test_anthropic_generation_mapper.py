@@ -14,6 +14,7 @@ from whero.vatbrain import (
     MessageItem,
     RemoteContextHint,
     ResponseFormat,
+    ReasoningConfig,
     TextPart,
     ToolCallConfig,
     ToolChoice,
@@ -198,6 +199,152 @@ def test_generation_mapper_maps_response_format_to_output_config() -> None:
     }
 
 
+def test_generation_mapper_maps_reasoning_to_thinking_and_merges_output_config() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"answer": {"type": "string"}},
+        "required": ["answer"],
+    }
+    request = GenerationRequest(
+        model="claude-test",
+        items=[MessageItem.user("answer as json")],
+        response_format=ResponseFormat(json_schema=schema),
+        reasoning=ReasoningConfig(mode="auto", effort="high", summary="auto"),
+        generation_config=GenerationConfig(top_p=0.96, max_output_tokens=2048),
+    )
+
+    params = to_anthropic_generation_params(request)
+
+    assert params["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert params["output_config"] == {
+        "format": {
+            "type": "json_schema",
+            "schema": schema,
+        },
+        "effort": "high",
+    }
+
+
+def test_generation_mapper_maps_reasoning_budget_and_disabled_mode() -> None:
+    budgeted = to_anthropic_generation_params(
+        GenerationRequest(
+            model="claude-test",
+            items=[MessageItem.user("think carefully")],
+            reasoning=ReasoningConfig(budget_tokens=1024, effort="high", summary="omitted"),
+            generation_config=GenerationConfig(max_output_tokens=2048),
+        )
+    )
+    disabled = to_anthropic_generation_params(
+        GenerationRequest(
+            model="claude-test",
+            items=[MessageItem.user("plain answer")],
+            reasoning=ReasoningConfig(mode="disabled"),
+            generation_config=GenerationConfig(temperature=0.2, max_output_tokens=64),
+            provider_options={"top_k": 10},
+        )
+    )
+
+    assert budgeted["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": 1024,
+        "display": "omitted",
+    }
+    assert budgeted["output_config"] == {"effort": "high"}
+    assert disabled["thinking"] == {"type": "disabled"}
+    assert disabled["temperature"] == 0.2
+    assert disabled["top_k"] == 10
+
+
+def test_generation_mapper_rejects_invalid_reasoning_options() -> None:
+    base_request = {
+        "model": "claude-test",
+        "items": [MessageItem.user("hello")],
+        "generation_config": GenerationConfig(max_output_tokens=2048),
+    }
+
+    rejection_cases = [
+        (ReasoningConfig(mode="unknown"), UnsupportedCapabilityError, "mode"),
+        (ReasoningConfig(effort="minimal"), UnsupportedCapabilityError, "effort"),
+        (ReasoningConfig(budget_tokens=512), InvalidItemError, "budget_tokens"),
+        (ReasoningConfig(budget_tokens=2048), InvalidItemError, "less than max_tokens"),
+        (ReasoningConfig(mode="adaptive", budget_tokens=1024), UnsupportedCapabilityError, "adaptive"),
+        (ReasoningConfig(mode="disabled", effort="low"), UnsupportedCapabilityError, "conflicts"),
+        (ReasoningConfig(summary="detailed"), UnsupportedCapabilityError, "summary"),
+        (ReasoningConfig(include_trace=True), UnsupportedCapabilityError, "include_trace"),
+        (
+            ReasoningConfig(provider_options={"display": "summarized"}),
+            UnsupportedCapabilityError,
+            "provider_options",
+        ),
+    ]
+    for reasoning, error_type, message in rejection_cases:
+        with pytest.raises(error_type, match=message):
+            to_anthropic_generation_params(
+                GenerationRequest(**base_request, reasoning=reasoning)
+            )
+
+    with pytest.raises(UnsupportedCapabilityError, match="thinking"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **base_request,
+                reasoning=ReasoningConfig(mode="auto"),
+                provider_options={"thinking": {"type": "adaptive"}},
+            )
+        )
+
+
+def test_generation_mapper_rejects_active_reasoning_incompatibilities() -> None:
+    base_request = {
+        "model": "claude-test",
+        "items": [MessageItem.user("hello")],
+        "reasoning": ReasoningConfig(mode="auto"),
+        "generation_config": GenerationConfig(max_output_tokens=2048),
+    }
+
+    with pytest.raises(UnsupportedCapabilityError, match="prefilling"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **{
+                    **base_request,
+                    "items": [MessageItem.user("hello"), MessageItem.assistant("partial")],
+                }
+            )
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="temperature"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **{
+                    **base_request,
+                    "generation_config": GenerationConfig(temperature=0.1, max_output_tokens=2048),
+                }
+            )
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="top_p"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **{
+                    **base_request,
+                    "generation_config": GenerationConfig(top_p=0.8, max_output_tokens=2048),
+                }
+            )
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="top_k"):
+        to_anthropic_generation_params(
+            GenerationRequest(**base_request, provider_options={"top_k": 10})
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="forced tool_choice"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **base_request,
+                tool_call_config=ToolCallConfig(tool_choice=ToolChoice.REQUIRED),
+            )
+        )
+
+
 def test_anthropic_mapper_rejects_explicit_cache_control() -> None:
     base_request = {
         "model": "claude-test",
@@ -318,6 +465,7 @@ def test_anthropic_response_maps_content_blocks_usage_and_snapshots() -> None:
             cache_creation_input_tokens=10,
             cache_read_input_tokens=20,
             output_tokens=5,
+            output_tokens_details=SimpleNamespace(thinking_tokens=2),
             service_tier="standard",
         ),
     )
@@ -340,8 +488,10 @@ def test_anthropic_response_maps_content_blocks_usage_and_snapshots() -> None:
     assert mapped.usage.output_tokens == 5
     assert mapped.usage.total_tokens == 38
     assert mapped.usage.cached_tokens == 20
+    assert mapped.usage.reasoning_tokens == 2
     assert mapped.usage.metadata["provider_input_tokens"] == 3
     assert mapped.usage.metadata["cache_creation_input_tokens"] == 10
+    assert mapped.usage.metadata["output_tokens_details"]["thinking_tokens"] == 2
     assert mapped.usage.metadata["service_tier"] == "standard"
 
 
