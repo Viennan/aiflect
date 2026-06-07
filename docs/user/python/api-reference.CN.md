@@ -208,12 +208,14 @@ Anthropic client 方法：
 - `agenerate(...) -> GenerationResponse`
 - `stream_generate(...) -> Iterator[GenerationStreamEvent]`
 - `astream_generate(...) -> AsyncIterator[GenerationStreamEvent]`
+- `generate_parsed(...) -> ParsedGenerationResponse`
+- `agenerate_parsed(...) -> ParsedGenerationResponse`
 - `get_adapter_capability() -> AdapterCapability`
 - `get_model_capability(model, overrides=None) -> ModelCapability`
 
-Anthropic adapter 支持文本、图片理解、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
+Anthropic adapter 支持文本、图片理解、JSON Schema structured output、Pydantic structured output helper、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
 
-Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ResponseFormat` 或 `ReasoningConfig` 请求映射。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
+Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner 或 `ReasoningConfig` 请求映射。`ResponseFormat` 会映射为 Anthropic Messages API `output_config.format` JSON Schema。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
 
 ## Items
 
@@ -733,7 +735,7 @@ contact = output.parse_response(response).output_parsed
 
 ### Client Convenience
 
-OpenAI client 提供薄封装：
+OpenAI、Volcengine 与 Anthropic client 提供薄封装：
 
 ```python
 parsed = client.generate_parsed(
@@ -744,6 +746,8 @@ parsed = client.generate_parsed(
 ```
 
 `generate_parsed()` / `agenerate_parsed()` 使用默认 Pydantic helper 行为；如需自定义 schema name、description 或 strict，请显式使用 `pydantic_output()` + `generate()`。
+
+Anthropic adapter 不调用 Anthropic SDK `messages.parse()`；它会把 `ResponseFormat` 映射为 `output_config.format`，最终仍由 `pydantic_output()` 解析 assistant text。Anthropic JSON outputs 与 assistant message prefill 不兼容；请求携带 `ResponseFormat` 时最后一条消息不能是 assistant prefill。
 
 ## Embedding
 
@@ -1217,6 +1221,7 @@ model_capability = client.get_model_capability(
 - `supports_tools`
 - `supports_parallel_tool_calls`
 - `supports_tool_choice`
+- `supports_structured_output`
 - `supports_reasoning_config`
 - `supported_reasoning_efforts`
 - `supports_reasoning_budget`
@@ -1369,6 +1374,8 @@ from whero.vatbrain.core.errors import (
 - user function tool。
 - `tool_use` -> `FunctionCallItem`。
 - `FunctionResultItem` -> `tool_result`。
+- JSON Schema structured output。
+- Pydantic structured output helper。
 - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
 - `new_items_start_index` 兼容接收但忽略。
 - provider-native content block snapshot replay。
@@ -1382,10 +1389,11 @@ from whero.vatbrain.core.errors import (
 - media generation。
 - previous response 差分传输。
 - response-style remote context refresh。
-- `ResponseFormat` structured output。
 - `ReasoningConfig` 请求映射。
 - `FunctionToolType.CUSTOM`。
 - 显式 Anthropic `cache_control`。
+- 显式 Anthropic `output_config` / 旧 beta `output_format`。
+- structured output 与 assistant message prefill 同用。
 - provider-hosted/server tools、web search、code execution、MCP 或 SDK Tool Runner。
 - provider conversation 持久化上下文抽象。
 - 跨 provider replay。

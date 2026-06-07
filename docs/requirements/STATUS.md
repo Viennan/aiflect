@@ -1,7 +1,7 @@
 # 需求状态总览
 
 状态：持续维护
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 定位
 
@@ -30,6 +30,7 @@
 
 | Requirement | Status | Progress | Requirement Doc | Key Docs | Updated |
 | --- | --- | --- | --- | --- | --- |
+| Python Anthropic structured output | `Completed` | `ResponseFormat` 已映射为 Anthropic `output_config.format`，parsed helpers、capability、测试与文档已完成 | [REQ-2026-06-python-anthropic-structured-output.CN.md](REQ-2026-06-python-anthropic-structured-output.CN.md) | [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md), [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md), [anthropic-quickstart.CN.md](../user/python/anthropic-quickstart.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-06-07 |
 | RemoteContextHint 与缓存策略升级 | `Completed` | `previous_response_id/covered_item_count/store` 替换为 `enable_cache/new_items_start_index`，response-style provider 自动管理 response id 与失效 refresh，Anthropic 保持 full messages automatic cache | [REQ-2026-06-remote-context-cache-strategy.CN.md](REQ-2026-06-remote-context-cache-strategy.CN.md) | [provider-native-replay.CN.md](../design/provider-native-replay.CN.md), [remote-context-cache-strategy.CN.md](../impls/python/remote-context-cache-strategy.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-06-06 |
 | Python Anthropic adapter | `Completed` | Anthropic Messages API generation/streaming、图片理解、function tools、automatic prefix caching 和 capability 已落地 | [REQ-2026-06-python-anthropic-adapter.CN.md](REQ-2026-06-python-anthropic-adapter.CN.md) | [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md), [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md), [anthropic-quickstart.CN.md](../user/python/anthropic-quickstart.CN.md) | 2026-06-06 |
 | Python reference implementation roadmap | `Completed` | v0.2 到 v0.5 阶段目标已完成，后续关注项保留在需求文档中 | [REQ-2026-05-python-reference-implementation-roadmap.CN.md](REQ-2026-05-python-reference-implementation-roadmap.CN.md) | [impls/python/STATUS.md](../impls/python/STATUS.md) | 2026-06-04 |

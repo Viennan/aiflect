@@ -166,6 +166,38 @@ def test_generation_mapper_replays_tool_use_and_tool_result_as_messages() -> Non
     ]
 
 
+def test_generation_mapper_maps_response_format_to_output_config() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "email": {"type": "string"},
+        },
+        "required": ["name", "email"],
+        "additionalProperties": False,
+    }
+    request = GenerationRequest(
+        model="claude-test",
+        items=[MessageItem.user("extract")],
+        response_format=ResponseFormat(
+            json_schema=schema,
+            json_schema_name="contact",
+            json_schema_description="Extracted contact.",
+            json_schema_strict=True,
+        ),
+        generation_config=GenerationConfig(max_output_tokens=64),
+    )
+
+    params = to_anthropic_generation_params(request)
+
+    assert params["output_config"] == {
+        "format": {
+            "type": "json_schema",
+            "schema": schema,
+        }
+    }
+
+
 def test_anthropic_mapper_rejects_explicit_cache_control() -> None:
     base_request = {
         "model": "claude-test",
@@ -195,6 +227,33 @@ def test_anthropic_mapper_rejects_explicit_cache_control() -> None:
             GenerationRequest(
                 **base_request,
                 tools=[ToolSpec(name="lookup", provider_options={"cache_control": {"type": "ephemeral"}})],
+            )
+        )
+
+
+def test_anthropic_mapper_rejects_explicit_structured_output_options() -> None:
+    base_request = {
+        "model": "claude-test",
+        "items": [MessageItem.user("hello")],
+        "generation_config": GenerationConfig(max_output_tokens=32),
+    }
+
+    with pytest.raises(UnsupportedCapabilityError, match="output_config"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **base_request,
+                provider_options={"output_config": {"format": {"type": "json_schema"}}},
+            )
+        )
+
+    with pytest.raises(UnsupportedCapabilityError, match="output_format"):
+        to_anthropic_generation_params(
+            GenerationRequest(
+                **base_request,
+                remote_context=RemoteContextHint(
+                    enable_cache=True,
+                    provider_options={"output_format": {"type": "json_schema"}},
+                ),
             )
         )
 
@@ -233,11 +292,11 @@ def test_anthropic_mapper_rejects_unsupported_inputs_and_options() -> None:
             )
         )
 
-    with pytest.raises(UnsupportedCapabilityError, match="ResponseFormat"):
+    with pytest.raises(UnsupportedCapabilityError, match="prefilling"):
         to_anthropic_generation_params(
             GenerationRequest(
                 model="claude-test",
-                items=[MessageItem.user("json")],
+                items=[MessageItem.user("json"), MessageItem.assistant("{")],
                 response_format=ResponseFormat(json_schema={"type": "object"}),
                 generation_config=GenerationConfig(max_output_tokens=32),
             )

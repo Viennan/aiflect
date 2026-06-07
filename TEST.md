@@ -121,7 +121,8 @@ Model entries use:
 
 `capabilities` keys should match `ModelCapability` field names where possible,
 for example `supports_streaming`, `supports_tools`,
-`supports_parallel_tool_calls`, `supports_reasoning_config`,
+`supports_parallel_tool_calls`, `supports_structured_output`,
+`supports_reasoning_config`,
 `supports_text_embedding`, `supports_multimodal_embedding`,
 `input_modalities`, `output_modalities`, and `output_dimensions`.
 
@@ -186,6 +187,7 @@ File API tests must:
                 "supports_streaming": true,
                 "supports_tools": true,
                 "supports_parallel_tool_calls": true,
+                "supports_structured_output": true,
                 "input_modalities": ["text", "image"],
                 "output_modalities": ["text"]
               }
@@ -206,6 +208,7 @@ File API tests must:
               "enabled": true,
               "capabilities": {
                 "supports_streaming": true,
+                "supports_structured_output": true,
                 "input_modalities": ["text", "image"],
                 "output_modalities": ["text"]
               }
@@ -228,6 +231,7 @@ File API tests must:
               "capabilities": {
                 "supports_streaming": true,
                 "supports_tools": true,
+                "supports_structured_output": true,
                 "supports_reasoning_config": true,
                 "input_modalities": ["text", "image", "video", "file"],
                 "output_modalities": ["text"]
@@ -240,6 +244,7 @@ File API tests must:
               "capabilities": {
                 "supports_streaming": true,
                 "supports_tools": true,
+                "supports_structured_output": true,
                 "supports_reasoning_config": true,
                 "input_modalities": ["text", "image", "video", "file"],
                 "output_modalities": ["text"]

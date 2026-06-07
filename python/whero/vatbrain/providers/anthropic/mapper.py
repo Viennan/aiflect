@@ -13,6 +13,7 @@ from whero.vatbrain.core.generation import (
     GenerationResponse,
     ReplayMode,
     ReplayPolicy,
+    ResponseFormat,
     ToolCallConfig,
 )
 from whero.vatbrain.core.items import (
@@ -36,6 +37,8 @@ from whero.vatbrain.core.usage import Usage
 PROVIDER = "anthropic"
 API_FAMILY = "messages"
 _CACHE_CONTROL = "cache_control"
+_OUTPUT_CONFIG = "output_config"
+_OUTPUT_FORMAT = "output_format"
 
 
 def to_anthropic_generation_params(
@@ -46,17 +49,25 @@ def to_anthropic_generation_params(
     """Convert a vatbrain generation request into Anthropic Messages API parameters."""
 
     _reject_explicit_cache_control(request.provider_options, owner="GenerationRequest.provider_options")
+    _reject_explicit_structured_output_options(
+        request.provider_options,
+        owner="GenerationRequest.provider_options",
+    )
     if request.remote_context is not None:
         _reject_explicit_cache_control(
             request.remote_context.provider_options,
             owner="RemoteContextHint.provider_options",
         )
-    if request.response_format is not None:
-        raise UnsupportedCapabilityError("Anthropic adapter does not yet support ResponseFormat.")
+        _reject_explicit_structured_output_options(
+            request.remote_context.provider_options,
+            owner="RemoteContextHint.provider_options",
+        )
     if request.reasoning is not None:
         raise UnsupportedCapabilityError("Anthropic adapter does not yet support ReasoningConfig.")
 
     system, messages = _items_to_anthropic_messages(request.items, request.replay_policy)
+    if request.response_format is not None:
+        _reject_structured_output_prefill(messages)
     params: dict[str, Any] = {
         "model": request.model,
         "messages": messages,
@@ -69,6 +80,8 @@ def to_anthropic_generation_params(
         params["tools"] = [_tool_to_anthropic_tool(tool) for tool in request.tools]
     if request.generation_config:
         params.update(_generation_config_to_params(request.generation_config))
+    if request.response_format:
+        params[_OUTPUT_CONFIG] = _response_format_to_anthropic_output_config(request.response_format)
     if request.tool_call_config:
         params.update(_tool_call_config_to_params(request.tool_call_config))
     params.update(request.provider_options)
@@ -364,6 +377,15 @@ def _generation_config_to_params(config: GenerationConfig) -> dict[str, Any]:
     return params
 
 
+def _response_format_to_anthropic_output_config(response_format: ResponseFormat) -> dict[str, Any]:
+    return {
+        "format": {
+            "type": "json_schema",
+            "schema": response_format.json_schema,
+        }
+    }
+
+
 def _tool_call_config_to_params(config: ToolCallConfig) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if config.tool_choice is not None:
@@ -464,6 +486,23 @@ def _reject_explicit_cache_control(options: Mapping[str, Any], *, owner: str) ->
         raise UnsupportedCapabilityError(
             f"{owner} cannot set Anthropic cache_control explicitly; "
             "use RemoteContextHint.enable_cache=True for automatic prompt caching."
+        )
+
+
+def _reject_explicit_structured_output_options(options: Mapping[str, Any], *, owner: str) -> None:
+    reserved = sorted({_OUTPUT_CONFIG, _OUTPUT_FORMAT}.intersection(options))
+    if reserved:
+        joined = ", ".join(reserved)
+        raise UnsupportedCapabilityError(
+            f"{owner} cannot set Anthropic structured output options explicitly "
+            f"({joined}); use ResponseFormat instead."
+        )
+
+
+def _reject_structured_output_prefill(messages: list[dict[str, Any]]) -> None:
+    if messages and messages[-1].get("role") == "assistant":
+        raise UnsupportedCapabilityError(
+            "Anthropic structured output is incompatible with assistant message prefilling."
         )
 
 

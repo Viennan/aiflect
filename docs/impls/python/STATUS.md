@@ -1,8 +1,8 @@
 # Python 实现状态
 
-状态：v0.6 Anthropic adapter 与 remote context cache 策略升级已完成
+状态：v0.6 Anthropic adapter、Anthropic structured output 与 remote context cache 策略升级已完成
 日期：2026-05-05
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 定位
 
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter，并完成 RemoteContextHint/cache 策略升级：通用 API 使用 `enable_cache/new_items_start_index`，response-style provider 自动管理 response id 与失效 refresh，Anthropic provider 保持 full messages automatic caching。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthropic adapter、Anthropic structured output，并完成 RemoteContextHint/cache 策略升级：通用 API 使用 `enable_cache/new_items_start_index`，response-style provider 自动管理 response id 与失效 refresh，Anthropic provider 保持 full messages automatic caching。
 
 核心文档：
 
@@ -68,6 +68,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - API family capability。
   - `CapabilityValue` 来源与可靠性。
   - adapter/model capability。
+  - model-level `supports_structured_output`。
   - provider/model supported reasoning efforts 字段。
 - `core.errors` 与 `core.usage`：
   - provider request/response mapping error 诊断字段。
@@ -122,7 +123,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - `PydanticOutputSpec.parse_text()` 与 `parse_response()`。
 - `ParsedGenerationResponse.output_parsed`。
 - `StructuredOutputParseError`。
-- OpenAI client `generate_parsed()` / `agenerate_parsed()`。
+- OpenAI、Volcengine 与 Anthropic client `generate_parsed()` / `agenerate_parsed()`。
 - 默认 schema name 来自 type 名称，description 来自 type docstring，strict 为 `True`。
 
 ### Volcengine Adapter
@@ -193,6 +194,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - `messages.create`。
 - Messages generation：
   - text/image input。
+  - JSON Schema structured output via `output_config.format`。
   - initial system/developer instruction prefix 映射为 Anthropic top-level `system`。
   - Anthropic Messages API 要求 `max_tokens`；通过 `GenerationConfig.max_output_tokens` 或 provider-native `provider_options["max_tokens"]` 提供。
   - user-executed function tools。
@@ -201,6 +203,11 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
   - `thinking` / `redacted_thinking` content block 尽量映射为 `ReasoningItem`。
   - provider-native content block snapshot 与 same-provider replay。
   - usage/cache token mapping。
+  - structured output 与 assistant message prefill 不兼容；同用时提前抛 `UnsupportedCapabilityError`。
+  - 拒绝显式 provider-native `output_config` 与旧 beta `output_format`，用户统一使用 `ResponseFormat`。
+- Parsed structured output：
+  - `generate_parsed()` / `agenerate_parsed()` 使用既有 `pydantic_output()` helper。
+  - 最终响应复用 `ParsedGenerationResponse` / `StructuredOutputParseError`。
 - Automatic prefix caching：
   - `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
   - `new_items_start_index` 兼容接收但忽略。
@@ -209,7 +216,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.6 Anthrop
 - Messages streaming：
   - message lifecycle、text delta、tool input JSON delta、thinking delta、usage update、completed/error 与 unknown passthrough。
 - Capability：
-  - adapter capability 声明 generation/streaming/async/function tools/usage。
+  - adapter capability 声明 generation/streaming/async/structured output/function tools/usage。
   - text/image input modality。
   - 不支持 embedding、Files API、media generation、provider-hosted/server tools、SDK Tool Runner。
   - model capability 默认 unknown，支持用户 overrides。
@@ -256,4 +263,4 @@ cd python
 ../.venv/bin/python -m pytest
 ```
 
-当前 v0.6 基线：`185 passed, 6 skipped`。
+当前 v0.6 基线：`190 passed, 10 skipped`；Anthropic structured output 相关单测为 `21 passed`。

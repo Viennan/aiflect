@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from pydantic import BaseModel
 
 from whero.vatbrain import (
     ClientConfig,
@@ -87,6 +88,11 @@ class FakeAnthropicError(Exception):
     }
 
 
+class Contact(BaseModel):
+    name: str
+    email: str
+
+
 def _raw_response(response_id: str = "msg_1") -> SimpleNamespace:
     return SimpleNamespace(
         id=response_id,
@@ -146,6 +152,35 @@ def test_anthropic_client_stream_generate_maps_events() -> None:
     assert events[0].delta == "hi"
 
 
+def test_anthropic_client_generate_parsed_builds_output_config_and_parses_output() -> None:
+    raw_response = SimpleNamespace(
+        id="msg_parsed",
+        model="claude-test",
+        stop_reason="end_turn",
+        content=[
+            SimpleNamespace(
+                type="text",
+                text='{"name":"Ada","email":"ada@example.test"}',
+            )
+        ],
+        usage=None,
+    )
+    fake = FakeAnthropic(raw_response)
+    client = AnthropicClient(client=fake, async_client=object())
+
+    parsed = client.generate_parsed(
+        model="claude-test",
+        items=[MessageItem.user("extract")],
+        output_type=Contact,
+        generation_config=GenerationConfig(max_output_tokens=64),
+    )
+
+    assert fake.messages.calls[0]["output_config"]["format"]["type"] == "json_schema"
+    assert fake.messages.calls[0]["output_config"]["format"]["schema"]["type"] == "object"
+    assert parsed.response.id == "msg_parsed"
+    assert parsed.output_parsed == Contact(name="Ada", email="ada@example.test")
+
+
 @pytest.mark.anyio
 async def test_anthropic_async_client_generate_and_stream() -> None:
     fake_async = FakeAsyncAnthropic(_raw_response("msg_async"))
@@ -182,6 +217,35 @@ async def test_anthropic_async_client_generate_and_stream() -> None:
     ]
 
     assert events[0].delta == "async"
+
+
+@pytest.mark.anyio
+async def test_anthropic_async_client_generate_parsed_builds_output_config_and_parses_output() -> None:
+    raw_response = SimpleNamespace(
+        id="msg_async_parsed",
+        model="claude-test",
+        stop_reason="end_turn",
+        content=[
+            SimpleNamespace(
+                type="text",
+                text='{"name":"Ada","email":"ada@example.test"}',
+            )
+        ],
+        usage=None,
+    )
+    fake_async = FakeAsyncAnthropic(raw_response)
+    client = AnthropicClient(client=object(), async_client=fake_async)
+
+    parsed = await client.agenerate_parsed(
+        model="claude-test",
+        items=[MessageItem.user("extract")],
+        output_type=Contact,
+        generation_config=GenerationConfig(max_output_tokens=64),
+    )
+
+    assert fake_async.messages.calls[0]["output_config"]["format"]["type"] == "json_schema"
+    assert parsed.response.id == "msg_async_parsed"
+    assert parsed.output_parsed.email == "ada@example.test"
 
 
 def test_anthropic_client_wraps_provider_errors() -> None:

@@ -166,6 +166,7 @@ class ModelCapability:
     supports_tools: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     supports_parallel_tool_calls: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     supports_tool_choice: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
+    supports_structured_output: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     supports_reasoning_config: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)
     supported_reasoning_efforts: CapabilityValue[tuple[str, ...]] = field(default_factory=CapabilityValue.unknown)
     supports_reasoning_budget: CapabilityValue[bool] = field(default_factory=CapabilityValue.unknown)

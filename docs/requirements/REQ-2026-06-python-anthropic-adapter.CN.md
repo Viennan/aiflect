@@ -2,7 +2,7 @@
 
 状态：Completed
 创建日期：2026-06-05
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 背景
 
@@ -14,8 +14,8 @@
 
 - 在 Python 参考实现中新增 Anthropic provider adapter。
 - 支持 Claude Messages API generation、streaming、async generation、图片理解和 user-executed function tools。
-- 通过 `RemoteContextHint.store=True` 启用 Anthropic automatic prefix caching，同时保持 Full-context First。
-- 保持与 Responses API 风格的用户代码兼容：允许读取 response id，也允许传入 `RemoteContextHint.previous_response_id`，但 Anthropic adapter 对该 id 做忽略处理。
+- 通过 `RemoteContextHint.enable_cache=True` 启用 Anthropic automatic prefix caching，同时保持 Full-context First。
+- 保持与 response-style provider 的编程模型兼容：用户仍传完整上下文，Anthropic adapter 返回 provider response id，但不使用 response id 做差分传输。
 
 ## 范围
 
@@ -40,7 +40,7 @@
 ### 已完成子目标
 
 - 明确 Anthropic provider MVP 范围与非范围。
-- 明确 cache control 语义：`RemoteContextHint.store=True` 映射为 top-level automatic prompt caching；`previous_response_id` 与 `covered_item_count` 在 Anthropic adapter 中忽略。
+- 明确 cache control 语义：`RemoteContextHint.enable_cache=True` 映射为 top-level automatic prompt caching；`new_items_start_index` 在 Anthropic adapter 中忽略。
 - 明确 Python mapper、client、capability、streaming 和测试设计。
 - 已将设计与实现方案落入知识库。
 - 已实现 Python provider package、optional dependency、request/response mapper、stream mapper、client、capability 和单元测试。
@@ -54,17 +54,19 @@
 
 - 设计文档：[anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md)
 - 实现文档：[anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md)
+- Structured output 需求：[REQ-2026-06-python-anthropic-structured-output.CN.md](REQ-2026-06-python-anthropic-structured-output.CN.md)
 - 高层设计：[high-level-design.CN.md](../design/high-level-design.CN.md)
 - Provider 能力整合：[provider-capability-integration.CN.md](../design/provider-capability-integration.CN.md)
 - Provider 原生重放：[provider-native-replay.CN.md](../design/provider-native-replay.CN.md)
 - 第三方资料：
   - Anthropic Messages API：https://docs.anthropic.com/en/api/messages
   - Anthropic Python SDK：https://docs.anthropic.com/en/api/sdks/python
+  - Anthropic structured outputs：https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs
   - Anthropic prompt caching：https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
   - Anthropic tool use：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
   - Anthropic vision：https://docs.anthropic.com/en/docs/build-with-claude/vision
 
 ## 开放问题
 
-- `ResponseFormat` 已明确延后到 structured-output 专项实现；Anthropic MVP 中请求该能力会抛 `UnsupportedCapabilityError`。
+- `ResponseFormat` 已由 [REQ-2026-06-python-anthropic-structured-output.CN.md](REQ-2026-06-python-anthropic-structured-output.CN.md) 完成支持。
 - 初始 `MessageItem.developer` 映射到 top-level `system` 是否需要提供严格模式以便用户拒绝有损 authority 映射。

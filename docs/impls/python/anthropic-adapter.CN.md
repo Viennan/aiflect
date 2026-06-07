@@ -2,7 +2,7 @@
 
 状态：已实现
 日期：2026-06-05
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 定位
 
@@ -18,15 +18,19 @@ Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthrop
 - `anthropic` optional dependency。
 - `to_anthropic_generation_params()` 与 `from_anthropic_generation_response()`。
 - `from_anthropic_stream_event()`。
+- `ResponseFormat` structured output 请求映射。
+- `generate_parsed()` / `agenerate_parsed()`。
 - Anthropic adapter/model capability。
 - 单元测试覆盖 mapper、stream、client 和 capability。
 
 实现决策：
 
-- `ResponseFormat` 与 `ReasoningConfig` 请求映射暂不支持，遇到即抛 `UnsupportedCapabilityError`。
+- `ResponseFormat` 映射为 Anthropic Messages API `output_config.format` JSON Schema，不调用 Anthropic SDK `messages.parse()`。
+- `ReasoningConfig` 请求映射暂不支持，遇到即抛 `UnsupportedCapabilityError`。
 - `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
 - `new_items_start_index` 兼容接收但忽略，不做差分传输。
 - 用户显式传入 `cache_control` 会被拒绝，避免形成 explicit cache control 隐式入口。
+- 用户显式传入 `output_config` 或旧 beta `output_format` 会被拒绝，避免绕过 `ResponseFormat`。
 
 ## 依赖与包结构
 
@@ -69,11 +73,13 @@ class AnthropicClient:
     async def agenerate(...) -> GenerationResponse: ...
     def stream_generate(...) -> Iterator[GenerationStreamEvent]: ...
     async def astream_generate(...) -> AsyncIterator[GenerationStreamEvent]: ...
+    def generate_parsed(...) -> ParsedGenerationResponse: ...
+    async def agenerate_parsed(...) -> ParsedGenerationResponse: ...
     def get_adapter_capability() -> AdapterCapability: ...
     def get_model_capability(model, overrides=None) -> ModelCapability: ...
 ```
 
-本阶段不提供 `generate_parsed()` / `agenerate_parsed()`。Anthropic structured output 后续可在 `ResponseFormat` 专项支持时补充。
+`generate_parsed()` / `agenerate_parsed()` 与 OpenAI/Volcengine client 一样是薄封装：使用 `pydantic_output(output_type)` 生成 `ResponseFormat`，调用现有 `generate()` / `agenerate()`，再解析最终 assistant text。
 
 初始化参数：
 
@@ -127,7 +133,9 @@ stream=True -> stream=True
 
 Anthropic Messages API 要求 `max_tokens`。MVP 建议如果 `GenerationConfig.max_output_tokens` 缺失且 `provider_options` 中没有 `max_tokens`，mapper 抛出 `InvalidItemError`。
 
-`cache_control` 是 Anthropic adapter 保留字段。用户不能通过 `GenerationRequest.provider_options`、`RemoteContextHint.provider_options` 或 tool `provider_options` 显式设置 `cache_control`；MVP 建议遇到该字段时抛 `UnsupportedCapabilityError`，避免形成 explicit cache control 的隐式后门。
+`cache_control` 是 Anthropic adapter 保留字段。用户不能通过 `GenerationRequest.provider_options`、`RemoteContextHint.provider_options` 或 tool `provider_options` 显式设置 `cache_control`；遇到该字段时抛 `UnsupportedCapabilityError`，避免形成 explicit cache control 的隐式后门。
+
+`output_config` 与旧 beta `output_format` 也是 Anthropic adapter 保留字段。用户不能通过 `GenerationRequest.provider_options` 或 `RemoteContextHint.provider_options` 显式设置；structured output 应通过 `ResponseFormat` 进入 adapter。
 
 ### RemoteContextHint 与 Cache
 
@@ -233,7 +241,33 @@ mapper 需要把连续的 tool result 与后续 user text 组织为同一个 use
 
 ### Reasoning 与 Structured Output
 
-当前实现选择最小档：`ReasoningConfig` 和 `ResponseFormat` 暂不支持，遇到即抛 `UnsupportedCapabilityError`。Provider 返回的 `thinking` / `redacted_thinking` content block 会尽量映射为 `ReasoningItem`。
+当前实现仍不支持 `ReasoningConfig` 请求映射，遇到即抛 `UnsupportedCapabilityError`。Provider 返回的 `thinking` / `redacted_thinking` content block 会尽量映射为 `ReasoningItem`。
+
+`ResponseFormat` 支持 JSON Schema structured output，并映射为 Anthropic Messages API 的 GA 形态：
+
+```text
+ResponseFormat.json_schema -> output_config.format.schema
+output_config.format.type = "json_schema"
+```
+
+示例 payload：
+
+```python
+{
+    "output_config": {
+        "format": {
+            "type": "json_schema",
+            "schema": response_format.json_schema,
+        }
+    }
+}
+```
+
+`ResponseFormat.json_schema_name`、`json_schema_description` 与 `json_schema_strict` 保留 vatbrain 侧语义，不映射到 Anthropic payload 中未明确支持的字段。Pydantic helper 的 strict schema normalization 仍会体现在 `json_schema` body 中。
+
+实现不调用 Anthropic SDK `messages.parse()`；该 SDK helper 只作为体验参考，adapter 仍走 `messages.create`，保持 request/response mapping、provider-native snapshot、streaming 和 Pydantic helper 的统一行为。
+
+Anthropic 文档标记 JSON outputs 与 message prefilling 不兼容。因此当请求携带 `ResponseFormat` 且转换后的最后一条 message role 为 `assistant` 时，mapper 会提前抛出 `UnsupportedCapabilityError`。
 
 ## Response Mapping
 
@@ -373,13 +407,16 @@ supported=True
 streaming=True
 input_modalities=("text", "image")
 output_modalities=("text",)
-structured_output=False
+structured_output=True
 reasoning_config=False
 reasoning_output=True
 remote_context=True
 function_tools=True
 metadata["remote_context_semantics"] =
   "enable_cache maps to automatic prompt caching; new_items_start_index ignored; no transport delta"
+metadata["structured_output_transport"] = "output_config.format"
+metadata["structured_output_parse_helper"] = "pydantic_output"
+metadata["structured_output_message_prefill_compatible"] = False
 ```
 
 Tool capability：
@@ -425,6 +462,9 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
   - `new_items_start_index` ignored and full messages retained。
   - function tool mapping。
   - explicit `cache_control` in request/remote/tool provider options is rejected。
+  - `ResponseFormat` maps to `output_config.format` JSON Schema。
+  - explicit `output_config` / `output_format` in provider options is rejected。
+  - structured output with assistant prefill is rejected。
   - function call / function result replay mapping。
   - unsupported custom tool、audio/video/file part。
   - usage cache token normalization。
@@ -437,6 +477,7 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
   - unknown passthrough。
 - `test_anthropic_client.py`
   - sync/async client injected fake SDK。
+  - `generate_parsed()` / `agenerate_parsed()` build `output_config.format` and parse assistant JSON text。
   - credential validation。
   - ProviderRequestError mapping。
   - no response-style remote context refresh。
@@ -455,11 +496,12 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 1. 已修改 `python/pyproject.toml`，新增 `anthropic` extra。
 2. 已新增 provider package 与 lazy SDK import。
 3. 已实现 `capabilities.py`。
-4. 已实现 `mapper.py`，覆盖 text/image/tool/cache/usage。
+4. 已实现 `mapper.py`，覆盖 text/image/tool/cache/usage/structured output。
 5. 已实现 `client.py` sync/async generation。
 6. 已实现 `stream.py` 与 stream client。
-7. 已添加单元测试。
-8. 已同步 [STATUS.md](STATUS.md)、用户 quickstart/API reference 和总索引。
+7. 已实现 `generate_parsed()` / `agenerate_parsed()`。
+8. 已添加单元测试。
+9. 已同步 [STATUS.md](STATUS.md)、用户 quickstart/API reference 和总索引。
 
 ## FAQ
 
@@ -475,6 +517,10 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 
 `FunctionToolType.CUSTOM` 当前表示 OpenAI custom tool 的 freeform input。Anthropic client tools 使用 JSON schema input。MVP 支持用户自定义 function tools，但不把 OpenAI-style custom tool 降级模拟为 Anthropic JSON object。
 
+### 为什么不调用 Anthropic SDK `messages.parse()`？
+
+`messages.parse()` 是 Anthropic Python SDK 的便捷层，会把输出格式转换为 `output_config.format`。`vatbrain` 需要保持 provider-neutral 的 `ResponseFormat`、response mapping、snapshot、streaming 和 Pydantic helper 行为，所以直接调用 `messages.create` 并在 mapper 中显式构造 `output_config.format`。
+
 ## 参考资料
 
 - [anthropic-provider-support.CN.md](../../design/anthropic-provider-support.CN.md)
@@ -482,6 +528,7 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
 - Anthropic Messages API：https://docs.anthropic.com/en/api/messages
 - Anthropic Python SDK：https://docs.anthropic.com/en/api/sdks/python
+- Anthropic structured outputs：https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs
 - Anthropic prompt caching：https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
 - Anthropic streaming：https://docs.anthropic.com/en/docs/build-with-claude/streaming
 - Anthropic tool use：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview

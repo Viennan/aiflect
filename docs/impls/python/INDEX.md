@@ -1,7 +1,7 @@
 # Python 实现文档索引
 
 状态：持续维护
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 定位
 
@@ -24,7 +24,7 @@
 
 - [openai-adapter.CN.md](openai-adapter.CN.md)：Python OpenAI adapter 实现方案，描述首个 provider adapter 的范围、核心模型、OpenAI 映射、测试策略和实现步骤。
 - [volcengine-adapter.CN.md](volcengine-adapter.CN.md)：Python Volcengine adapter MVP 实现方案与实现记录，覆盖 Ark SDK-only 调用边界、Responses generation/streaming、Files API、多模态 embedding、capability 和 replay。
-- [anthropic-adapter.CN.md](anthropic-adapter.CN.md)：Python Anthropic adapter 实现方案与实现记录，覆盖 Messages API generation/streaming、图片理解、user-executed function tools、automatic prefix caching、usage/capability 和测试边界。
+- [anthropic-adapter.CN.md](anthropic-adapter.CN.md)：Python Anthropic adapter 实现方案与实现记录，覆盖 Messages API generation/streaming、图片理解、JSON Schema structured output、user-executed function tools、automatic prefix caching、usage/capability 和测试边界。
 
 ### Python Convenience
 
@@ -36,4 +36,5 @@
 - [REQ-2026-05-python-openai-adapter.CN.md](../../requirements/REQ-2026-05-python-openai-adapter.CN.md)：Python OpenAI adapter 需求记录。
 - [REQ-2026-05-python-pydantic-structured-output.CN.md](../../requirements/REQ-2026-05-python-pydantic-structured-output.CN.md)：Python Pydantic structured output 需求记录。
 - [REQ-2026-06-python-anthropic-adapter.CN.md](../../requirements/REQ-2026-06-python-anthropic-adapter.CN.md)：Python Anthropic adapter 需求记录。
+- [REQ-2026-06-python-anthropic-structured-output.CN.md](../../requirements/REQ-2026-06-python-anthropic-structured-output.CN.md)：Python Anthropic structured output 需求记录。
 - [REQ-2026-06-remote-context-cache-strategy.CN.md](../../requirements/REQ-2026-06-remote-context-cache-strategy.CN.md)：RemoteContextHint 与缓存策略升级需求记录。

@@ -2,7 +2,7 @@
 
 状态：设计稿
 日期：2026-06-05
-最近更新：2026-06-06
+最近更新：2026-06-07
 
 ## 背景
 
@@ -55,6 +55,21 @@ Anthropic 支持 client tools、server tools、MCP、web search、code execution
 
 Provider-hosted/server tools 和 SDK Tool Runner 暂不进入范围。
 
+### Structured Output Uses Existing ResponseFormat
+
+Anthropic structured outputs 不引入新的 core 字段。`vatbrain` 继续使用既有 `ResponseFormat` 表达 JSON Schema structured output，由 Anthropic adapter 在 provider-local mapper 中转换为 Messages API 的 `output_config.format`：
+
+```text
+ResponseFormat.json_schema
+  -> messages.create(output_config={"format": {"type": "json_schema", "schema": ...}})
+```
+
+Anthropic Python SDK 的 `messages.parse()` 可作为体验参考，但 adapter 不调用该 helper。这样 request mapping、response mapping、streaming、provider-native snapshot 与 Python Pydantic helper 都仍走 `vatbrain` 的统一路径。
+
+`ResponseFormat.json_schema_name`、`json_schema_description` 与 `json_schema_strict` 保留通用语义，不提升为 Anthropic-specific core 字段，也不映射到 Anthropic payload 中未明确支持的字段。Strict schema 的主要作用来自 `pydantic_output(..., strict=True)` 对 JSON Schema body 的 normalization。
+
+Anthropic 的 JSON outputs 与 assistant message prefilling 不兼容，因此 adapter 应在请求携带 `ResponseFormat` 且最后一条 Anthropic message 为 assistant 时提前拒绝。
+
 ## Module Responsibilities
 
 ### Core
@@ -65,6 +80,7 @@ Core 不为 Anthropic adapter 增加新字段。现有模型已经足够表达 M
 - `RemoteContextHint.enable_cache`：作为 provider-side cache 优化意图。
 - `RemoteContextHint.new_items_start_index`：兼容 response-style provider 的新增边界，但 Anthropic adapter 忽略。
 - `ToolSpec` / `FunctionToolSpec`：user-executed function tool schema。
+- `ResponseFormat`：JSON Schema structured output。
 - `FunctionCallItem` / `FunctionResultItem`：tool use 和 tool result 协议。
 - `Usage.cached_tokens` 与 `Usage.metadata`：cache 命中与写入统计。
 - `ProviderItemSnapshot`：保存 Anthropic content block 或 message payload，用于同 provider replay。
@@ -77,6 +93,7 @@ Provider adapter 负责：
 - 将 Anthropic response content blocks 映射为 `MessageItem`、`FunctionCallItem`、`ReasoningItem` 等 normalized items。
 - 将 Anthropic streaming events 映射为 `GenerationStreamEvent`。
 - 将 Anthropic usage 中的 cache read/create token 归一化为 `Usage`。
+- 将 `ResponseFormat` 映射为 Anthropic `output_config.format` JSON Schema。
 - 声明 adapter capability 和 model capability。
 
 Anthropic adapter 不负责：
@@ -159,8 +176,8 @@ Generation capability：
 ```text
 input_modalities=("text", "image")
 output_modalities=("text",)
-structured_output=根据 MVP 决策设置
-reasoning_config=根据 MVP 决策设置
+structured_output=True
+reasoning_config=False
 reasoning_output=True if thinking blocks mapped
 remote_context=True
 function_tools=True
@@ -171,6 +188,9 @@ function_tools=True
 ```text
 metadata["remote_context_semantics"] =
   "enable_cache maps to Anthropic automatic prompt caching; new_items_start_index is ignored; no transport delta"
+metadata["structured_output_transport"] = "output_config.format"
+metadata["structured_output_parse_helper"] = "pydantic_output"
+metadata["structured_output_message_prefill_compatible"] = False
 ```
 
 Tool capability：
@@ -202,6 +222,10 @@ tool_choice=True
 
 `vatbrain` 明确不自动执行工具。SDK Tool Runner 会运行工具并继续提交结果，属于 agent loop 行为，不属于 provider adapter 的职责。
 
+### 为什么不使用 Anthropic SDK `messages.parse()`？
+
+`messages.parse()` 是 Python SDK 的便捷层，而 `vatbrain` 已有 provider-neutral `ResponseFormat` 与 Pydantic structured output helper。adapter 直接构造 `output_config.format`，可以保持 request/response/stream/snapshot 路径统一，也避免把 Anthropic SDK 的 parse shortcut 变成新的 provider-specific 编程模型。
+
 ## 参考资料
 
 - [high-level-design.CN.md](high-level-design.CN.md)
@@ -209,6 +233,7 @@ tool_choice=True
 - [provider-native-replay.CN.md](provider-native-replay.CN.md)
 - Anthropic Messages API：https://docs.anthropic.com/en/api/messages
 - Anthropic Python SDK：https://docs.anthropic.com/en/api/sdks/python
+- Anthropic structured outputs：https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs
 - Anthropic prompt caching：https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
 - Anthropic tool use：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
 - Anthropic vision：https://docs.anthropic.com/en/docs/build-with-claude/vision

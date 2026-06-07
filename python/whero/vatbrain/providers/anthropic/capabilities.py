@@ -33,13 +33,16 @@ def get_adapter_capability() -> AdapterCapability:
             streaming=CapabilityValue.adapter_builtin(True),
             input_modalities=CapabilityValue.adapter_builtin(("text", "image")),
             output_modalities=CapabilityValue.adapter_builtin(("text",)),
-            structured_output=CapabilityValue.adapter_builtin(False),
+            structured_output=CapabilityValue.adapter_builtin(True),
             reasoning_config=CapabilityValue.adapter_builtin(False),
             reasoning_output=CapabilityValue.adapter_builtin(True),
             remote_context=CapabilityValue.adapter_builtin(True),
             function_tools=CapabilityValue.adapter_builtin(True),
             metadata={
                 "api_family": "messages",
+                "structured_output_transport": "output_config.format",
+                "structured_output_parse_helper": "pydantic_output",
+                "structured_output_message_prefill_compatible": False,
                 "remote_context_semantics": (
                     "enable_cache maps to Anthropic automatic prompt caching; "
                     "new_items_start_index is ignored; no transport delta"

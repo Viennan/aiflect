@@ -28,6 +28,7 @@ from whero.vatbrain.core.generation import (
 )
 from whero.vatbrain.core.items import Item
 from whero.vatbrain.core.tools import ToolSpec
+from whero.vatbrain.structured import ParsedGenerationResponse, pydantic_output
 from whero.vatbrain.providers.anthropic.capabilities import (
     get_adapter_capability,
     get_model_capability,
@@ -110,6 +111,35 @@ class AnthropicClient:
         )
         return from_anthropic_generation_response(response)
 
+    def generate_parsed(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        output_type: Any,
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ParsedGenerationResponse[Any]:
+        output_spec = pydantic_output(output_type)
+        response = self.generate(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=output_spec.response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        return output_spec.parse_response(response)
+
     async def agenerate(
         self,
         *,
@@ -141,6 +171,35 @@ class AnthropicClient:
             message="Anthropic async generation request failed.",
         )
         return from_anthropic_generation_response(response)
+
+    async def agenerate_parsed(
+        self,
+        *,
+        model: str,
+        items: list[Item] | tuple[Item, ...],
+        output_type: Any,
+        tools: list[ToolSpec] | tuple[ToolSpec, ...] = (),
+        generation_config: GenerationConfig | None = None,
+        reasoning: ReasoningConfig | None = None,
+        tool_call_config: ToolCallConfig | None = None,
+        remote_context: RemoteContextHint | None = None,
+        replay_policy: ReplayPolicy | None = None,
+        provider_options: dict[str, Any] | None = None,
+    ) -> ParsedGenerationResponse[Any]:
+        output_spec = pydantic_output(output_type)
+        response = await self.agenerate(
+            model=model,
+            items=items,
+            tools=tools,
+            generation_config=generation_config,
+            response_format=output_spec.response_format,
+            reasoning=reasoning,
+            tool_call_config=tool_call_config,
+            remote_context=remote_context,
+            replay_policy=replay_policy,
+            provider_options=provider_options,
+        )
+        return output_spec.parse_response(response)
 
     def stream_generate(
         self,

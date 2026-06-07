@@ -76,7 +76,9 @@ def test_anthropic_adapter_capability_declares_generation_only_surface() -> None
     assert capability.supports_function_tools is True
     assert capability.generation is not None
     assert capability.generation.input_modalities.value == ("text", "image")
+    assert capability.generation.structured_output.value is True
     assert capability.generation.remote_context.value is True
+    assert capability.generation.metadata["structured_output_transport"] == "output_config.format"
     assert capability.generation.metadata["remote_context_semantics"].startswith("enable_cache maps")
     assert capability.tools is not None
     assert capability.tools.user_function_tools.value is True
@@ -90,6 +92,7 @@ def test_model_capability_defaults_to_unknown_and_accepts_overrides() -> None:
         model_capability_overrides={
             "gpt-test": {
                 "supports_streaming": True,
+                "supports_structured_output": True,
                 "supported_reasoning_efforts": ("low", "medium"),
             },
         },
@@ -103,6 +106,7 @@ def test_model_capability_defaults_to_unknown_and_accepts_overrides() -> None:
     assert capability.max_context_tokens.value == 128000
     assert capability.max_context_tokens.source == CapabilitySource.USER_CONFIG
     assert capability.supports_streaming.value is True
+    assert capability.supports_structured_output.value is True
     assert capability.supported_reasoning_efforts.value == ("low", "medium")
     assert capability.output_dimensions.value is None
     assert capability.output_dimensions.source == CapabilitySource.UNKNOWN

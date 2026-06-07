@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from whero.vatbrain import (
     GenerationConfig,
@@ -20,6 +21,13 @@ from whero.vatbrain.core.generation import StreamEventType
 
 pytestmark = pytest.mark.costly
 _CACHE_MARKER = "VATBRAIN-CACHE-42"
+_STRUCTURED_CODE = "ALPHA42"
+
+
+class StructuredAnswer(BaseModel):
+    code: str
+    count: int
+    status: str
 
 
 @pytest.mark.provider("openai")
@@ -140,6 +148,39 @@ def test_costly_image_to_text_generation(
     assert any(token in text.lower() for token in ("seagull", "gull", "bird", "birds", "海鸥", "鸟"))
 
 
+@pytest.mark.provider("openai")
+@pytest.mark.provider("volcengine")
+@pytest.mark.provider("anthropic")
+@pytest.mark.feature("generation")
+def test_costly_structured_output_generation(costly_client: Any, costly_model_case: Any) -> None:
+    _require_structured_output_generation(costly_model_case)
+
+    try:
+        parsed = costly_client.generate_parsed(
+            model=costly_model_case.model_id,
+            items=[
+                MessageItem.system(
+                    "Return raw JSON only. Do not use markdown or code fences."
+                ),
+                MessageItem.user(
+                    "Extract this record: code ALPHA42, count 3, status ok."
+                ),
+            ],
+            output_type=StructuredAnswer,
+            generation_config=GenerationConfig(max_output_tokens=128),
+            reasoning=_reasoning_for(costly_model_case),
+        )
+    except ProviderRequestError as exc:
+        _skip_provider_unavailable(exc)
+        raise
+
+    assert parsed.response.provider == costly_model_case.provider
+    assert parsed.output_text.strip()
+    assert parsed.output_parsed.code == _STRUCTURED_CODE
+    assert parsed.output_parsed.count == 3
+    assert parsed.output_parsed.status.lower() == "ok"
+
+
 @pytest.mark.provider("volcengine")
 @pytest.mark.feature("generation")
 def test_costly_response_style_cached_multiturn_generation(
@@ -206,6 +247,12 @@ def _require_text_to_text_generation(costly_model_case: Any) -> None:
         pytest.skip("model does not declare text input support")
     if not costly_model_case.supports_modality("output_modalities", "text"):
         pytest.skip("model does not declare text output support")
+
+
+def _require_structured_output_generation(costly_model_case: Any) -> None:
+    _require_text_to_text_generation(costly_model_case)
+    if not costly_model_case.supports("supports_structured_output"):
+        pytest.skip("model does not declare structured output support")
 
 
 def _reasoning_for(costly_model_case: Any) -> ReasoningConfig | None:
