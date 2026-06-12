@@ -42,7 +42,7 @@ from whero.vatbrain.core.usage import Usage
 
 PROVIDER = "openai"
 API_FAMILY = "responses"
-_REMOTE_CONTEXT_RESERVED_OPTIONS = {"previous_response_id", "store"}
+_REMOTE_CONTEXT_RESERVED_OPTIONS = {"previous_response_id", "prompt_cache_key", "store"}
 
 
 def to_openai_generation_params(
@@ -355,6 +355,8 @@ def _remote_context_to_openai(
     previous_response_id: str | None = None,
 ) -> dict[str, Any]:
     params = dict(remote_context.provider_options)
+    if remote_context.enable_cache and remote_context.session_key is not None:
+        params["prompt_cache_key"] = remote_context.session_key
     if previous_response_id is not None:
         params["previous_response_id"] = previous_response_id
     params["store"] = remote_context.enable_cache
@@ -366,8 +368,8 @@ def _reject_remote_context_reserved_options(options: Mapping[str, Any], *, owner
     if reserved:
         names = ", ".join(reserved)
         raise UnsupportedCapabilityError(
-            f"{owner} cannot set {names}; use RemoteContextHint.enable_cache and "
-            "RemoteContextHint.new_items_start_index."
+            f"{owner} cannot set {names}; use RemoteContextHint.enable_cache, "
+            "RemoteContextHint.session_key, and RemoteContextHint.new_items_start_index."
         )
 
 

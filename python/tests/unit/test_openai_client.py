@@ -265,6 +265,8 @@ def test_client_generate_uses_explicit_model_and_common_options() -> None:
     assert response.metadata["remote_context"] == {
         "api_family": "responses",
         "cache_enabled": True,
+        "session_cache_enabled": False,
+        "session_key_present": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": True,
         "refreshed_after_invalid_context": False,
@@ -305,6 +307,8 @@ def test_client_generate_refreshes_invalid_remote_context() -> None:
     assert response.metadata["remote_context"] == {
         "api_family": "responses",
         "cache_enabled": True,
+        "session_cache_enabled": False,
+        "session_key_present": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": False,
         "refreshed_after_invalid_context": True,
@@ -395,6 +399,8 @@ async def test_async_client_generate_replays_without_remote_context_when_enabled
     assert response.metadata["remote_context"] == {
         "api_family": "responses",
         "cache_enabled": True,
+        "session_cache_enabled": False,
+        "session_key_present": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": False,
         "refreshed_after_invalid_context": True,

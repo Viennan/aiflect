@@ -1,8 +1,8 @@
 # Volcengine Provider 快速开始
 
-状态：v0.5
+状态：v0.8
 日期：2026-05-28
-最近更新：2026-05-31
+最近更新：2026-06-12
 
 ## 定位
 
@@ -305,6 +305,7 @@ second = client.generate(
     items=items,
     remote_context=RemoteContextHint(
         enable_cache=True,
+        session_key="topic-session",
         new_items_start_index=len(history),
     ),
 )
@@ -312,12 +313,15 @@ second = client.generate(
 
 用户仍传完整 `items`。当 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，adapter 会向 Ark Responses API 发送未覆盖的 suffix。previous response 失效时，adapter 会自动移除失效 id 并用完整 `items` refresh 一次。
 
+提供 `session_key` 时，Volcengine adapter 会启用 Responses API Session cache：自动设置 `store=True`、`caching={"type":"enabled"}` 和 `expire_at=当前时间+1小时`。`expire_at` 不作为 generation public 参数暴露；如果 anchor response 已接近过期，adapter 会跳过 `previous_response_id` 并直接用完整 `items` 建立新的缓存链。`GenerationResponse.metadata["remote_context"]` 会记录是否使用了 previous response、是否因为即将过期而 refresh，以及不会记录原始 `session_key`。
+
 ## 当前限制
 
 - 文本 generation 只使用 Ark SDK Responses API，不提供 Chat API fallback。
 - 图片生成只使用 Ark SDK Images API。
 - 视频生成只使用 Ark SDK Content Generation tasks。
 - 不使用 OpenAI-compatible SDK surface。
+- generation 不暴露自定义 `expire_at`；Session cache 生命周期固定 1 小时。
 - 不自动上传本地文件。
 - 不自动执行工具。
 - 不提供 provider-hosted tools / MCP 的稳定通用抽象。

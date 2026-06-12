@@ -1,8 +1,8 @@
 # Python 快速开始
 
-状态：v0.7
+状态：v0.8
 日期：2026-05-05
-最近更新：2026-06-07
+最近更新：2026-06-12
 
 ## 读者路径
 
@@ -143,6 +143,7 @@ response = client.generate(
     items=items,
     remote_context=RemoteContextHint(
         enable_cache=True,
+        session_key="contract-review-thread",
         new_items_start_index=len(history_items),
     ),
 )
@@ -151,8 +152,10 @@ response = client.generate(
 要点：
 
 - 用户侧仍传入完整 `items`。
+- `session_key` 可选，用于表达多轮对话 session/cache pool；OpenAI 映射为 `prompt_cache_key`，Volcengine 映射为 Responses API Session cache，Anthropic 当前兼容接收但不下发。
 - `new_items_start_index` 表示完整 `items` 中从哪里开始是本轮新增 item。
 - OpenAI/Volcengine adapter 会从边界前一个 item 的 provider snapshot metadata 中读取 response id；找到时只向 provider 发送追加 suffix，找不到时发送完整 `items`。
+- Volcengine session cache 由 adapter 管理 `caching` 与 `expire_at`，固定 1 小时生命周期；当 previous response 接近过期时会自动改用完整 `items`。
 - 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应先验证其支持 `previous_response_id` / stored response 链接能力，再使用 `new_items_start_index`；未验证前可以只启用 `enable_cache=True` 或不传 `remote_context`，保持完整 `items` 请求。
 - Anthropic adapter 忽略 `new_items_start_index`；`RemoteContextHint.enable_cache=True` 会开启 automatic prompt caching，且仍发送完整上下文。
 - response id 由 adapter 写入 provider snapshot metadata，用户不需要保存或传回。

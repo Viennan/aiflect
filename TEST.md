@@ -63,6 +63,9 @@ image-to-text generation, image embedding, and cached multi-turn generation
 model cases from `creds.json`. Cached multi-turn generation covers both
 OpenAI full-context cache-enabled requests, response-id style cache reuse for
 Volcengine adapters, and automatic prompt caching for the Anthropic adapter.
+Volcengine Session cache costly tests require the model matrix to declare
+`supports_session_cache=true`; otherwise they are skipped because the cache
+service may require account/model activation outside adapter control.
 Response-id style costly tests assert that the second turn used
 `previous_response_id` successfully and did not pass only because the adapter
 refreshed with full context. Image-input tests use raw inline data from

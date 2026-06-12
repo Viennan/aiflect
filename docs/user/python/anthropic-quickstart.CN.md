@@ -1,8 +1,8 @@
 # Anthropic Provider 快速开始
 
-状态：v0.6
+状态：v0.8
 日期：2026-06-06
-最近更新：2026-06-07
+最近更新：2026-06-12
 
 ## 定位
 
@@ -68,7 +68,7 @@ for item in response.output_items:
 
 ## Automatic Prefix Cache
 
-Anthropic adapter 将 `RemoteContextHint.enable_cache=True` 映射为 Anthropic automatic prompt caching。`new_items_start_index` 可以复用 response-style provider 的调用形状，但 adapter 会忽略它；每次请求仍从完整 `items` 构造 full Messages API 输入。
+Anthropic adapter 将 `RemoteContextHint.enable_cache=True` 映射为 Anthropic automatic prompt caching。`session_key` 可以复用通用 session cache 调用形状，但当前不会下发给 Anthropic；`new_items_start_index` 可以复用 response-style provider 的调用形状，但 adapter 会忽略它；每次请求仍从完整 `items` 构造 full Messages API 输入。
 
 ```python
 from whero.vatbrain import GenerationConfig, MessageItem, RemoteContextHint
@@ -91,6 +91,7 @@ response = client.generate(
     generation_config=GenerationConfig(max_output_tokens=300),
     remote_context=RemoteContextHint(
         enable_cache=True,
+        session_key="risk-review-thread",
         new_items_start_index=len(history_items),
     ),
 )
@@ -100,6 +101,7 @@ response = client.generate(
 
 - 用户侧仍传入完整 `items`。
 - `enable_cache=True` 开启 automatic prompt caching。
+- `session_key` 当前兼容接收但不下发，仅用于保持跨 provider 调用形状。
 - `new_items_start_index` 只用于兼容 response-style provider 的新增边界形状，Anthropic adapter 不使用它做差分传输。
 - 不支持显式传入 Anthropic `cache_control`；如在 request、remote context 或 tool `provider_options` 中设置 `cache_control`，adapter 会抛出 `UnsupportedCapabilityError`。
 

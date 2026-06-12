@@ -34,7 +34,14 @@ from whero.vatbrain.providers.volcengine.mapper import (
 )
 
 
-def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
+def _volcengine_anchor(
+    response_id: str = "resp_old",
+    *,
+    response_expire_at: int | None = None,
+) -> MessageItem:
+    metadata = {"response_id": response_id}
+    if response_expire_at is not None:
+        metadata["response_expire_at"] = response_expire_at
     return MessageItem(
         Role.ASSISTANT,
         "covered",
@@ -48,7 +55,7 @@ def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
                     "role": "assistant",
                     "content": [{"type": "output_text", "text": "covered"}],
                 },
-                metadata={"response_id": response_id},
+                metadata=metadata,
             )
         ],
     )
@@ -132,7 +139,6 @@ def test_generation_request_routes_sdk_unknown_body_fields_to_extra_body() -> No
         items=[MessageItem.user("hello")],
         remote_context=RemoteContextHint(
             provider_options={
-                "expire_at": 1_800_000_000,
                 "context_management": {"edits": [{"type": "clear_thinking"}]},
             }
         ),
@@ -146,7 +152,6 @@ def test_generation_request_routes_sdk_unknown_body_fields_to_extra_body() -> No
 
     params = to_volcengine_generation_params(request)
 
-    assert params["expire_at"] == 1_800_000_000
     assert params["service_tier"] == "fast"
     assert params["extra_body"] == {
         "context_management": {"edits": [{"type": "clear_thinking"}]},
@@ -154,6 +159,71 @@ def test_generation_request_routes_sdk_unknown_body_fields_to_extra_body() -> No
         "metadata": {"trace_id": "trace-1"},
         "custom_flag": True,
     }
+
+
+def test_generation_mapper_rejects_explicit_expire_at() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem.user("hello")],
+        provider_options={"expire_at": 1_800_000_000},
+    )
+
+    with pytest.raises(UnsupportedCapabilityError, match="expire_at"):
+        to_volcengine_generation_params(request)
+
+
+def test_generation_mapper_maps_session_cache_params() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[_volcengine_anchor(response_expire_at=1_800_003_700), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="session-1",
+            new_items_start_index=1,
+        ),
+    )
+
+    params = to_volcengine_generation_params(request, now=1_800_000_000)
+
+    assert params["previous_response_id"] == "resp_old"
+    assert params["store"] is True
+    assert params["caching"] == {"type": "enabled"}
+    assert params["expire_at"] == 1_800_003_600
+    assert len(params["input"]) == 1
+
+
+def test_generation_mapper_refreshes_session_cache_before_previous_response_expiry() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[_volcengine_anchor(response_expire_at=1_800_000_299), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="session-1",
+            new_items_start_index=1,
+        ),
+    )
+
+    params = to_volcengine_generation_params(request, now=1_800_000_000)
+
+    assert "previous_response_id" not in params
+    assert params["caching"] == {"type": "enabled"}
+    assert params["expire_at"] == 1_800_003_600
+    assert len(params["input"]) == 2
+
+
+def test_generation_mapper_rejects_session_cache_conflicting_fields() -> None:
+    request = GenerationRequest(
+        model="doubao-test",
+        items=[MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="session-1",
+        ),
+        provider_options={"caching": {"type": "enabled"}},
+    )
+
+    with pytest.raises(UnsupportedCapabilityError, match="caching"):
+        to_volcengine_generation_params(request)
 
 
 def test_generation_mapper_can_replay_without_remote_context() -> None:
@@ -241,6 +311,10 @@ def test_generation_response_maps_reasoning_function_call_output_and_snapshots()
         id="resp_1",
         model="doubao-test",
         status="completed",
+        created_at=1_800_000_000,
+        expire_at=1_800_003_600,
+        caching=SimpleNamespace(type="enabled"),
+        store=True,
         output=[
             SimpleNamespace(
                 type="reasoning",
@@ -285,6 +359,9 @@ def test_generation_response_maps_reasoning_function_call_output_and_snapshots()
     assert mapped.output_items[0].summary == "I checked the premise."
     assert mapped.output_items[0].provider_snapshots[0].payload["type"] == "reasoning"
     assert mapped.output_items[0].provider_snapshots[0].metadata["response_id"] == "resp_1"
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_expire_at"] == 1_800_003_600
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_caching"] == {"type": "enabled"}
+    assert mapped.output_items[0].provider_snapshots[0].metadata["response_store"] is True
     assert mapped.output_items[1].provider_snapshots[0].metadata["response_id"] == "resp_1"
     assert isinstance(mapped.output_items[2], FunctionCallItem)
     assert mapped.output_items[2].name == "lookup"

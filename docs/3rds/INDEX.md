@@ -1,7 +1,7 @@
 # 第三方资料索引
 
 状态：持续维护  
-最近更新：2026-06-07
+最近更新：2026-06-12
 
 ## DeepSeek
 
@@ -9,7 +9,7 @@
 
 ## Volcengine
 
-- [volengine/INDEX.md](volengine/INDEX.md)：火山方舟第三方资料索引，按 API 家族归纳 Responses、Responses API 文本/多模态/reasoning/tool calling 专题与详细参数 reference、Chat、Files/file object reference、多模态 embedding API reference、图片理解、视频理解、图片/视频生成 API reference、结构化输出、函数调用、reasoning 与 streaming。
+- [volengine/INDEX.md](volengine/INDEX.md)：火山方舟第三方资料索引，按 API 家族归纳 Responses、Responses API 上下文缓存、文本/多模态/reasoning/tool calling 专题与详细参数 reference、Chat、Files/file object reference、多模态 embedding API reference、图片理解、视频理解、图片/视频生成 API reference、结构化输出、函数调用、reasoning 与 streaming。
 
 ## 维护说明
 

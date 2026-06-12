@@ -2,7 +2,7 @@
 
 状态：Completed  
 日期：2026-06-06  
-最近更新：2026-06-06
+最近更新：2026-06-12
 
 ## 目标模型
 
@@ -11,11 +11,14 @@
 ```text
 RemoteContextHint
 - enable_cache: bool = False
+- session_key: str | None = None
 - new_items_start_index: int | None = None
 - provider_options: dict[str, Any]
 ```
 
 `new_items_start_index` 是完整 `items` 中新增 item 的起始 index。它不是 response id 的覆盖计数；用户不再传入 response id。response-style adapter 只检查 `items[new_items_start_index - 1]` 上是否存在匹配 provider/API family 的 response id。
+
+`session_key` 是后续补充的多轮 session/cache pool hint；它不改变本文件记录的 response id 差分传输模型。具体 provider 映射见 [session-cache-strategy.CN.md](session-cache-strategy.CN.md)。
 
 ## Core 改动
 
@@ -56,6 +59,8 @@ OpenAI 与 Volcengine 的非流式 generation response 会在 `GenerationRespons
 
 - `api_family`: `"responses"`。
 - `cache_enabled`: 本次 request 中 `RemoteContextHint.enable_cache` 的值。
+- `session_cache_enabled`: 本次 request 是否启用了 `session_key` 对应的 session/cache pool 策略。
+- `session_key_present`: 本次 request 是否提供了 `session_key`；metadata 不记录原始 key。
 - `attempted_previous_response_id`: 初始请求是否携带 `previous_response_id`。
 - `final_request_used_previous_response_id`: 最终成功的请求是否携带 `previous_response_id`。
 - `refreshed_after_invalid_context`: 是否因为 previous response/context invalid 或 expired 执行了 full-context refresh。

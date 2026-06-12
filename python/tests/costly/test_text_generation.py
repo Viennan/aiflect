@@ -20,7 +20,9 @@ from whero.vatbrain.core.generation import StreamEventType
 
 
 pytestmark = pytest.mark.costly
+_SMOKE_TOKEN = "VBTOKEN42"
 _CACHE_MARKER = "VATBRAIN-CACHE-42"
+_CACHE_SESSION_KEY = "vatbrain-costly-cache-session"
 _STRUCTURED_CODE = "ALPHA42"
 _REASONING_MAX_OUTPUT_TOKENS = 2048
 
@@ -45,7 +47,7 @@ def test_costly_text_generation_response(costly_client: Any, costly_model_case: 
         items=[
             MessageItem.system("Answer briefly in plain text."),
             MessageItem.user(
-                "Reply with one short plain-text sentence that includes the word VATBRAIN."
+                f"Reply with one short plain-text sentence that includes the token {_SMOKE_TOKEN}."
             ),
         ],
         generation_config=GenerationConfig(max_output_tokens=128),
@@ -55,7 +57,7 @@ def test_costly_text_generation_response(costly_client: Any, costly_model_case: 
     assert response.provider == costly_model_case.provider
     text = _response_text(response)
     assert text.strip()
-    assert "vatbrain" in text.lower()
+    assert _SMOKE_TOKEN.lower() in text.lower()
     if response.usage is not None:
         assert response.usage.total_tokens is None or response.usage.total_tokens > 0
 
@@ -78,7 +80,7 @@ def test_costly_text_generation_stream(costly_client: Any, costly_model_case: An
             model=costly_model_case.model_id,
             items=[
                 MessageItem.user(
-                    "Stream one short plain-text sentence that includes the word VATBRAIN."
+                    f"Stream one short plain-text sentence that includes the token {_SMOKE_TOKEN}."
                 )
             ],
             generation_config=GenerationConfig(max_output_tokens=128),
@@ -203,7 +205,7 @@ def test_costly_anthropic_reasoning_generation(
             MessageItem.system("Answer briefly in plain text."),
             MessageItem.user(
                 "Use reasoning if helpful, then reply with one short sentence "
-                "that includes the word VATBRAIN."
+                f"that includes the token {_SMOKE_TOKEN}."
             ),
         ],
         generation_config=GenerationConfig(max_output_tokens=_REASONING_MAX_OUTPUT_TOKENS),
@@ -217,7 +219,7 @@ def test_costly_anthropic_reasoning_generation(
     assert response.provider == "anthropic"
     text = _response_text(response)
     assert text.strip()
-    assert "vatbrain" in text.lower()
+    assert _SMOKE_TOKEN.lower() in text.lower()
     if response.usage is not None and response.usage.reasoning_tokens is not None:
         assert response.usage.reasoning_tokens >= 0
 
@@ -248,6 +250,33 @@ def test_costly_response_style_cached_multiturn_generation(
     assert _CACHE_MARKER.lower() in _response_text(second_response).lower()
 
 
+@pytest.mark.provider("volcengine")
+@pytest.mark.feature("generation")
+def test_costly_volcengine_session_cache_multiturn_generation(
+    costly_client: Any,
+    costly_model_case: Any,
+) -> None:
+    if not costly_model_case.supports("supports_session_cache"):
+        pytest.skip("model does not declare Volcengine Session cache support")
+
+    _first_response, second_response = _run_cached_multiturn_generation(
+        costly_client,
+        costly_model_case,
+        session_key=_CACHE_SESSION_KEY,
+    )
+
+    remote_context = second_response.metadata.get("remote_context", {})
+    assert remote_context.get("session_cache_enabled") is True
+    assert remote_context.get("session_key_present") is True
+    assert remote_context.get("attempted_previous_response_id") is True
+    assert remote_context.get("final_request_used_previous_response_id") is True
+    assert remote_context.get("refreshed_after_invalid_context") is False
+    assert remote_context.get("refreshed_before_expiry") is False
+    assert _CACHE_MARKER.lower() in _response_text(second_response).lower()
+    if second_response.usage is not None and second_response.usage.cached_tokens is not None:
+        assert second_response.usage.cached_tokens >= 0
+
+
 @pytest.mark.provider("openai")
 @pytest.mark.feature("generation")
 def test_costly_openai_full_context_cached_multiturn_generation(
@@ -258,9 +287,12 @@ def test_costly_openai_full_context_cached_multiturn_generation(
         costly_client,
         costly_model_case,
         use_new_items_start_index=False,
+        session_key=_CACHE_SESSION_KEY,
     )
 
     remote_context = second_response.metadata.get("remote_context", {})
+    assert remote_context.get("session_cache_enabled") is True
+    assert remote_context.get("session_key_present") is True
     assert remote_context.get("attempted_previous_response_id") is False
     assert remote_context.get("final_request_used_previous_response_id") is False
     assert remote_context.get("refreshed_after_invalid_context") is False
@@ -327,6 +359,7 @@ def _run_cached_multiturn_generation(
     costly_model_case: Any,
     *,
     use_new_items_start_index: bool = True,
+    session_key: str | None = None,
 ) -> tuple[Any, Any]:
     _require_text_to_text_generation(costly_model_case)
 
@@ -343,7 +376,10 @@ def _run_cached_multiturn_generation(
         items=first_items,
         generation_config=GenerationConfig(max_output_tokens=32),
         reasoning=_reasoning_for(costly_model_case),
-        remote_context=RemoteContextHint(enable_cache=True),
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key=session_key,
+        ),
     )
     assert first_response.provider == costly_model_case.provider
     assert first_response.output_items
@@ -353,10 +389,14 @@ def _run_cached_multiturn_generation(
     second_remote_context = (
         RemoteContextHint(
             enable_cache=True,
+            session_key=session_key,
             new_items_start_index=len(history),
         )
         if use_new_items_start_index
-        else RemoteContextHint(enable_cache=True)
+        else RemoteContextHint(
+            enable_cache=True,
+            session_key=session_key,
+        )
     )
     second_response = _generate_or_skip_provider_unavailable(
         costly_client,

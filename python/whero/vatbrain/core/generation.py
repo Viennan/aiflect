@@ -55,10 +55,13 @@ class RemoteContextHint:
     """Provider-side cache/delta hints that do not replace full context."""
 
     enable_cache: bool = False
+    session_key: str | None = None
     new_items_start_index: int | None = None
     provider_options: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.session_key is not None and not self.session_key.strip():
+            raise ValueError("RemoteContextHint.session_key must not be empty.")
         if self.new_items_start_index is not None and self.new_items_start_index < 0:
             raise ValueError("RemoteContextHint.new_items_start_index must be non-negative.")
         object.__setattr__(self, "provider_options", dict(self.provider_options))

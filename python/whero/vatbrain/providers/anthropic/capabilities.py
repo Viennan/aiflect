@@ -51,8 +51,10 @@ def get_adapter_capability() -> AdapterCapability:
                 "structured_output_message_prefill_compatible": False,
                 "remote_context_semantics": (
                     "enable_cache maps to Anthropic automatic prompt caching; "
+                    "session_key is accepted but not transported; "
                     "new_items_start_index is ignored; no transport delta"
                 ),
+                "session_key_transport": "ignored",
             },
         ),
         tools=ToolCapability(

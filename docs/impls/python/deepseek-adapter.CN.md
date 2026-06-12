@@ -96,7 +96,7 @@ to_deepseek_generation_params(request, stream=False) -> dict[str, Any]
 - `ToolCallConfig.parallel_tool_calls=False`。
 - unsupported reasoning fields：`budget_tokens`、`summary`、`include_trace`、`provider_options`。
 
-`RemoteContextHint.enable_cache=True` 与 `new_items_start_index` 被兼容接收，但不影响 params。
+`RemoteContextHint.enable_cache=True`、`session_key` 与 `new_items_start_index` 被兼容接收，但不影响 params。
 
 ## Response Mapper
 

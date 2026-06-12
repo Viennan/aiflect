@@ -25,7 +25,7 @@ from whero.vatbrain import (
     ToolSpec,
     VideoPart,
 )
-from whero.vatbrain.core.errors import InvalidItemError, ProviderResponseMappingError
+from whero.vatbrain.core.errors import InvalidItemError, ProviderResponseMappingError, UnsupportedCapabilityError
 from whero.vatbrain.core.items import FunctionCallItem
 from whero.vatbrain.providers.openai.mapper import (
     from_openai_generation_response,
@@ -173,8 +173,8 @@ def test_generation_request_maps_remote_context_hint() -> None:
         items=[_openai_anchor(), MessageItem.user("hello")],
         remote_context=RemoteContextHint(
             enable_cache=True,
+            session_key="cache-key",
             new_items_start_index=1,
-            provider_options={"prompt_cache_key": "cache-key"},
         ),
     )
 
@@ -185,6 +185,20 @@ def test_generation_request_maps_remote_context_hint() -> None:
     assert params["input"][0]["content"] == [{"type": "input_text", "text": "hello"}]
     assert params["store"] is True
     assert params["prompt_cache_key"] == "cache-key"
+
+
+def test_openai_generation_mapper_rejects_explicit_prompt_cache_key() -> None:
+    request = GenerationRequest(
+        model="gpt-test",
+        items=[MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            provider_options={"prompt_cache_key": "cache-key"},
+        ),
+    )
+
+    with pytest.raises(UnsupportedCapabilityError, match="prompt_cache_key"):
+        to_openai_generation_params(request)
 
 
 def test_openai_generation_mapper_uses_full_input_without_anchor_response_id() -> None:

@@ -729,6 +729,8 @@ def _response_style_remote_context_metadata(
     metadata: dict[str, Any] = {
         "api_family": "responses",
         "cache_enabled": request.remote_context.enable_cache,
+        "session_cache_enabled": bool(request.remote_context.enable_cache and request.remote_context.session_key),
+        "session_key_present": request.remote_context.session_key is not None,
         "attempted_previous_response_id": bool(initial_params.get("previous_response_id")),
         "final_request_used_previous_response_id": bool(final_params.get("previous_response_id")),
         "refreshed_after_invalid_context": refreshed_after_invalid_context,

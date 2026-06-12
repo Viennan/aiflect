@@ -21,8 +21,9 @@ def test_generation_config_does_not_accept_stop_sequences() -> None:
 def test_generation_request_accepts_remote_context_hint() -> None:
     remote_context = RemoteContextHint(
         enable_cache=True,
+        session_key="session-1",
         new_items_start_index=1,
-        provider_options={"prompt_cache_key": "k"},
+        provider_options={"metadata": {"trace_id": "t-1"}},
     )
 
     request = GenerationRequest(
@@ -33,7 +34,13 @@ def test_generation_request_accepts_remote_context_hint() -> None:
 
     assert request.remote_context is remote_context
     assert request.remote_context.enable_cache is True
+    assert request.remote_context.session_key == "session-1"
     assert request.remote_context.new_items_start_index == 1
+
+
+def test_remote_context_hint_validates_session_key() -> None:
+    with pytest.raises(ValueError):
+        RemoteContextHint(session_key=" ")
 
 
 def test_remote_context_hint_validates_new_items_start_index() -> None:

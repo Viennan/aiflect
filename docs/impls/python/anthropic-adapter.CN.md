@@ -140,7 +140,7 @@ Anthropic Messages API 要求 `max_tokens`。MVP 建议如果 `GenerationConfig.
 
 ### RemoteContextHint 与 Cache
 
-Anthropic mapper 只使用 `RemoteContextHint.enable_cache`：
+Anthropic mapper 只使用 `RemoteContextHint.enable_cache` 下发 automatic prompt caching：
 
 ```python
 if request.remote_context and request.remote_context.enable_cache is True:
@@ -149,10 +149,11 @@ if request.remote_context and request.remote_context.enable_cache is True:
 
 不映射：
 
+- `session_key`
 - `new_items_start_index`
 - `RemoteContextHint.provider_options`
 
-即使存在 `new_items_start_index`，也始终使用完整 `request.items` 构造 Anthropic messages。
+即使存在 `session_key` 或 `new_items_start_index`，也始终使用完整 `request.items` 构造 Anthropic messages。`session_key` 仅用于保持跨 provider 调用形状，当前不下发给 Anthropic。
 
 ### Messages 与 System
 

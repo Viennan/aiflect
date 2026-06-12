@@ -120,6 +120,7 @@ DeepSeek 官方兼容接口会忽略 Anthropic `cache_control`。因此 DeepSeek
 
 - `RemoteContextHint.enable_cache=True`：兼容接收，不改变 transport。
 - `RemoteContextHint.new_items_start_index`：兼容接收，忽略。
+- `RemoteContextHint.session_key`：兼容接收，不下发。
 - 不发送 `cache_control`。
 - 不做 previous response 差分传输。
 - 用户显式传入 `cache_control` 会抛 `UnsupportedCapabilityError`。

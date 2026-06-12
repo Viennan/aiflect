@@ -1,8 +1,8 @@
 # Python 实现状态
 
-状态：v0.7 DeepSeek provider 已完成
-日期：2026-06-07
-最近更新：2026-06-07
+状态：v0.8 Session cache 策略已完成
+日期：2026-06-12
+最近更新：2026-06-12
 
 ## 定位
 
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSeek provider：在既有 OpenAI、Volcengine、Anthropic provider 基线上，新增 DeepSeek Anthropic-compatible Messages API adapter，并完成 `api_format` 初始化参数、text generation/streaming、function tools、reasoning、cache hint 兼容、capability、测试与文档同步。Anthropic provider 已补充 `ReasoningConfig` extended thinking 请求映射。
+Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session cache 策略：在既有 OpenAI、Volcengine、Anthropic 与 DeepSeek provider 基线上，扩展 `RemoteContextHint.session_key`，并将其映射为 OpenAI `prompt_cache_key`、Volcengine adapter-managed Responses API Session cache。Anthropic 与 DeepSeek 兼容接收该字段但首期不下发。
 
 核心文档：
 
@@ -22,6 +22,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
 - [anthropic-adapter.CN.md](anthropic-adapter.CN.md)
 - [deepseek-adapter.CN.md](deepseek-adapter.CN.md)
 - [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)
+- [session-cache-strategy.CN.md](session-cache-strategy.CN.md)
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
@@ -49,7 +50,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
   - `GenerationRequest`、`GenerationResponse`、`GenerationConfig`。
   - `ResponseFormat`，仅支持 JSON Schema structured output。
   - `ReasoningConfig`。
-  - `RemoteContextHint(enable_cache, new_items_start_index)`。
+  - `RemoteContextHint(enable_cache, session_key, new_items_start_index)`。
   - `ReplayPolicy`、`ReplayMode`。
   - `GenerationStreamEvent` 与 `GenerationStreamAccumulator`。
 - `core.embeddings`：
@@ -102,6 +103,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
 - Remote context 差分传输：
   - 用户仍传完整 `items`。
   - `RemoteContextHint.new_items_start_index` 表达新增 item 的起始位置。
+  - `RemoteContextHint.session_key` 映射为 OpenAI Responses API `prompt_cache_key`。
   - output item snapshot metadata 保存 parent response id。
   - 找到 anchor response id 时 optimized attempt 发送 suffix。
   - previous response 失效时自动 refresh 并重新构造完整 input。
@@ -150,7 +152,10 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
   - usage/cached/reasoning token mapping。
   - provider-native snapshot 与 same-provider replay。
   - `RemoteContextHint.enable_cache + new_items_start_index` 驱动的差分传输。
+  - `RemoteContextHint.session_key` 启用 adapter-managed Responses API Session cache，自动设置 `caching={"type":"enabled"}` 与 1 小时 `expire_at`。
+  - previous response 接近过期时自动跳过 `previous_response_id` 并使用 full-context refresh。
   - output item snapshot metadata 保存 parent response id。
+  - output item snapshot metadata 保存 response `created_at`、`expire_at`、`caching` 与 `store`，用于后续过期判断。
   - previous response 失效时自动 full-context refresh。
 - Responses streaming：
   - lifecycle、content part、text delta/done、function call arguments、reasoning summary、completed/incomplete/failed/error 与 unknown passthrough。
@@ -216,6 +221,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
 - Automatic prefix caching：
   - `RemoteContextHint.enable_cache=True` 映射为 top-level `cache_control={"type": "ephemeral"}`。
   - `new_items_start_index` 兼容接收但忽略。
+  - `session_key` 兼容接收但不下发，仅用于保持跨 provider 调用形状。
   - 不做 response-style previous response 差分传输。
   - 不暴露 explicit cache control；显式传入 `cache_control` 会抛 `UnsupportedCapabilityError`。
 - Messages streaming：
@@ -256,6 +262,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
 - Cache hint 兼容：
   - `RemoteContextHint.enable_cache=True` 兼容接收但不下发 `cache_control`。
   - `new_items_start_index` 兼容接收但忽略。
+  - `session_key` 兼容接收但不下发。
   - 不做 response-style previous response 差分传输。
   - 显式 `cache_control` 会抛 `UnsupportedCapabilityError`。
 - Capability：
@@ -296,7 +303,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.7 DeepSee
 - 不同 provider 的 reasoning effort 取值不同，应通过 capability 字段声明支持集合。
 - 同时支持多个兼容 API family 的 provider，应在 provider-specific adapter 中明确当前实现的 transport；DeepSeek 当前仅实现 Anthropic-compatible Messages API。
 - Provider-side state/cache/previous response 只能作为优化 hint，不改变 Full-context First。
-- `RemoteContextHint` 表达 `enable_cache` 与 `new_items_start_index`，不让用户直接传入 provider response id。
+- `RemoteContextHint` 表达 `enable_cache`、`session_key` 与 `new_items_start_index`，不让用户直接传入 provider response id。
 - Full-context First 要求用户传入完整 `items`，但 provider 请求层可以在新增边界明确且 anchor response id 可用时只传追加 suffix。
 - Response id 失效后的 refresh 由 response-style provider client 自动处理；强制 replay 缺少 provider-native snapshot 时应失败而不是静默降级。
 
@@ -307,4 +314,4 @@ cd python
 ../.venv/bin/python -m pytest
 ```
 
-当前 v0.7 基线：`214 passed, 11 skipped`。
+当前 v0.8 基线：`222 passed, 12 skipped`。

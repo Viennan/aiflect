@@ -44,6 +44,15 @@ def get_adapter_capability() -> AdapterCapability:
             reasoning_output=CapabilityValue.adapter_builtin(True),
             remote_context=CapabilityValue.adapter_builtin(True),
             function_tools=CapabilityValue.adapter_builtin(True),
+            metadata={
+                "api_family": "responses",
+                "remote_context_semantics": (
+                    "enable_cache stores responses; session_key enables adapter-managed "
+                    "Responses API Session cache; new_items_start_index can use previous_response_id"
+                ),
+                "session_key_transport": "responses_session_cache",
+                "session_cache_ttl_seconds": 3600,
+            },
         ),
         embedding=EmbeddingCapability(
             supported=CapabilityValue.adapter_builtin(True),

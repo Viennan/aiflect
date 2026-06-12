@@ -6,7 +6,7 @@
 
 ## 背景
 
-`vatbrain` 坚持 Full-context First：一次 generation 调用的语义事实来源应是用户传入的完整 `Item` 序列。provider 的 `previous_response_id`、cache、stored response 或 conversation state 只能作为优化提示，不能成为唯一上下文来源。`RemoteContextHint` 只表达是否启用 provider-side cache，以及完整 `items` 中新增 item 的起始位置。
+`vatbrain` 坚持 Full-context First：一次 generation 调用的语义事实来源应是用户传入的完整 `Item` 序列。provider 的 `previous_response_id`、cache、stored response 或 conversation state 只能作为优化提示，不能成为唯一上下文来源。`RemoteContextHint` 表达是否启用 provider-side cache、可选的多轮 session/cache pool 标识，以及完整 `items` 中新增 item 的起始位置。
 
 但不同 provider 的 Responses 风格 API 往往会在 input/output item 上携带对重放很关键的原生字段。OpenAI Responses API 的 assistant message `phase` 就是一个典型例子。它区分 `commentary` 与 `final_answer` 阶段；在 follow-up/replay 时丢失该字段，可能导致模型错误判断历史消息阶段，甚至提前终止。
 
@@ -119,11 +119,12 @@ ReplayPolicy
 
 ### Remote Context 覆盖范围
 
-`RemoteContextHint` 不再让用户传入 provider response id。它只表达是否启用 provider-side cache，以及完整 `GenerationRequest.items` 中新增 item 的起始位置：
+`RemoteContextHint` 不再让用户传入 provider response id。它表达是否启用 provider-side cache、可选的多轮 session/cache pool 标识，以及完整 `GenerationRequest.items` 中新增 item 的起始位置：
 
 ```text
 RemoteContextHint
 - enable_cache: bool
+- session_key: str | None
 - new_items_start_index: int | None
 - provider_options
 ```
@@ -133,6 +134,8 @@ RemoteContextHint
 response-style adapter 只检查边界前一个 item，即 `items[new_items_start_index - 1]`。如果该 item 的 provider snapshot metadata 中存在当前 provider/API family 的 response id，则 adapter 可以发送 `previous_response_id` 与 suffix；如果没有，则发送完整 `items`。
 
 `enable_cache` 表达是否启用 provider-side cache/stored response 优化。对 OpenAI/Volcengine Responses API，它映射为 `store` 并允许 adapter 创建未来可引用的 response；对 Anthropic Messages API，它映射为 automatic prompt caching，且仍发送完整 messages。
+
+`session_key` 表达多轮请求属于同一个 provider-side cache pool 的优化意图。OpenAI adapter 将其映射为 `prompt_cache_key`；Volcengine adapter 将其映射为 adapter-managed Responses API Session cache；Anthropic 与 DeepSeek 首期兼容接收但不下发。
 
 约束：
 

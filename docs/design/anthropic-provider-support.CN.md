@@ -33,6 +33,8 @@ RemoteContextHint.enable_cache=True
 
 `RemoteContextHint.new_items_start_index` 在 Anthropic adapter 中被忽略。这样同一段用户代码可以在 response-style provider 中表达新增边界，在 Anthropic 中仍保持 full messages 输入。
 
+`RemoteContextHint.session_key` 在 Anthropic adapter 中兼容接收但不下发。它仅保持与 OpenAI/Volcengine session cache 调用形状一致，当前仍由 Anthropic automatic prompt caching 自行维护缓存点。
+
 ### No Explicit Anthropic Cache Surface
 
 MVP 不暴露 Anthropic explicit cache control：
@@ -99,6 +101,7 @@ Core 不为 Anthropic adapter 增加新字段。现有模型已经足够表达 M
 
 - `GenerationRequest.items`：完整语义上下文。
 - `RemoteContextHint.enable_cache`：作为 provider-side cache 优化意图。
+- `RemoteContextHint.session_key`：兼容通用 session cache 调用形状，但 Anthropic adapter 首期不下发。
 - `RemoteContextHint.new_items_start_index`：兼容 response-style provider 的新增边界，但 Anthropic adapter 忽略。
 - `ToolSpec` / `FunctionToolSpec`：user-executed function tool schema。
 - `ResponseFormat`：JSON Schema structured output。
@@ -141,6 +144,9 @@ enable_cache=False
 
 new_items_start_index
   -> ignored by Anthropic adapter
+
+session_key
+  -> accepted but not transported
 ```
 
 因此 Anthropic generation 永远是：
@@ -211,7 +217,7 @@ function_tools=True
 
 ```text
 metadata["remote_context_semantics"] =
-  "enable_cache maps to Anthropic automatic prompt caching; new_items_start_index is ignored; no transport delta"
+  "enable_cache maps to Anthropic automatic prompt caching; session_key is accepted but not transported; new_items_start_index is ignored; no transport delta"
 metadata["structured_output_transport"] = "output_config.format"
 metadata["reasoning_transport"] = "thinking"
 metadata["reasoning_effort_transport"] = "output_config.effort"

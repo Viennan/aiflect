@@ -43,6 +43,14 @@ def get_adapter_capability() -> AdapterCapability:
             reasoning_output=CapabilityValue.adapter_builtin(False),
             remote_context=CapabilityValue.adapter_builtin(True),
             function_tools=CapabilityValue.adapter_builtin(True),
+            metadata={
+                "api_family": "responses",
+                "remote_context_semantics": (
+                    "enable_cache stores responses; session_key maps to prompt_cache_key; "
+                    "new_items_start_index can use previous_response_id"
+                ),
+                "session_key_transport": "prompt_cache_key",
+            },
         ),
         embedding=EmbeddingCapability(
             supported=CapabilityValue.adapter_builtin(True),

@@ -46,8 +46,10 @@ def get_adapter_capability() -> AdapterCapability:
                 "structured_output": "unsupported by DeepSeek Anthropic-compatible endpoint",
                 "reasoning_effort_transport": "output_config.effort",
                 "remote_context_semantics": (
-                    "DeepSeek ignores Anthropic cache_control; no remote context transport"
+                    "DeepSeek ignores Anthropic cache_control; session_key is accepted but "
+                    "not transported; no remote context transport"
                 ),
+                "session_key_transport": "ignored",
             },
         ),
         tools=ToolCapability(

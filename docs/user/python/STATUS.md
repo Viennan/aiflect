@@ -1,8 +1,8 @@
 # Python 用户文档状态
 
-状态：v0.7 Anthropic reasoning 与 DeepSeek provider 文档已补充
-日期：2026-06-07
-最近更新：2026-06-07
+状态：v0.8 Session cache 文档已补充
+日期：2026-06-12
+最近更新：2026-06-12
 
 ## 当前文档
 
@@ -22,6 +22,7 @@
   - 同步/异步 streaming。
   - 同步/异步 embedding。
   - 直接 Images API 图片生成、参考图生成与图片流式生成。
+  - `RemoteContextHint.session_key` 映射为 Responses API `prompt_cache_key`。
   - capability 查询。
 - Volcengine provider client：
   - `whero-vatbrain[volcengine]` optional dependency。
@@ -37,6 +38,7 @@
   - Ark Images API 图片生成、参考图生成与图片流式生成。
   - Ark Content Generation 视频任务创建、查询与轮询。
   - provider-native replay、snapshot response id 与 previous response 差分传输。
+  - `RemoteContextHint.session_key` 对应的 Responses API Session cache、固定 1 小时生命周期与过期前 full refresh。
   - capability 查询。
 - Anthropic provider client：
   - `whero-vatbrain[anthropic]` optional dependency。
@@ -51,6 +53,7 @@
   - user-executed function tools。
   - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
   - `new_items_start_index` 兼容接收但忽略，不做差分传输。
+  - `session_key` 兼容接收但不下发。
   - usage cache/reasoning token 映射。
   - capability 查询。
 - DeepSeek provider client：
@@ -65,6 +68,7 @@
   - `ReasoningConfig.effort -> output_config.effort`，支持 `high` / `max`。
   - user-executed function tools。
   - `RemoteContextHint.enable_cache=True` 兼容接收但不下发 `cache_control`。
+  - `session_key` 兼容接收但不下发。
   - usage cache token 映射。
   - capability 查询。
 - Generation：
@@ -73,7 +77,7 @@
   - `ReasoningConfig`。
   - `ToolCallConfig`。
   - `ResponseFormat` JSON Schema structured output。
-  - `RemoteContextHint.enable_cache` 与 `new_items_start_index`。
+  - `RemoteContextHint.enable_cache`、`session_key` 与 `new_items_start_index`。
   - `ReplayPolicy`、provider snapshot、OpenAI `phase` 与 `AssistantMessagePhase`。
   - response id 失效后的自动 full-context refresh。
 - Streaming：

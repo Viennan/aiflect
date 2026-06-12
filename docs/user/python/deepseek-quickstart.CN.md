@@ -1,8 +1,8 @@
 # DeepSeek Provider 快速开始
 
-状态：v0.7
+状态：v0.8 session cache 兼容说明已补充
 日期：2026-06-07
-最近更新：2026-06-07
+最近更新：2026-06-12
 
 ## 定位
 
@@ -152,7 +152,7 @@ response = client.generate(
 
 ## Cache Hint 兼容
 
-DeepSeek 会忽略 Anthropic `cache_control`。因此 DeepSeek adapter 接收 `RemoteContextHint` 只是为了兼容通用调用形状，不会下发 cache control，也不会做 response id 差分传输：
+DeepSeek 会忽略 Anthropic `cache_control`。因此 DeepSeek adapter 接收 `RemoteContextHint` 只是为了兼容通用调用形状；`session_key` 也会被兼容接收但不下发。adapter 不会下发 cache control，也不会做 response id 差分传输：
 
 ```python
 from whero.vatbrain import RemoteContextHint

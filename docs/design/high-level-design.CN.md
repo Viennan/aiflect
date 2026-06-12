@@ -2,7 +2,7 @@
 
 状态：设计草案  
 日期：2026-05-04  
-最近更新：2026-05-10
+最近更新：2026-06-12
 
 ## 背景
 
@@ -57,7 +57,9 @@
 
 provider 侧的 stored response、previous response、conversation、context cache 或其他上下文状态能力应被视为优化提示，而不是 `vatbrain` 的核心语义状态。
 
-`vatbrain` 允许用户通过 `RemoteContextHint` 表达是否启用 provider-side cache，以及完整 `items` 中新增 item 的起始位置。用户不直接管理 provider response id；response-style adapter 会从历史 item 的 provider snapshot metadata 中查找 response id，并按 provider 语义决定是否发送 suffix。调用语义仍由用户传入的完整 `Item` 序列定义。provider conversation 这类持久化上下文暂不进入通用 core 抽象，prompt/cache retention 与远端过期时间仍通过 provider-specific 能力处理。
+`vatbrain` 允许用户通过 `RemoteContextHint` 表达是否启用 provider-side cache、可选的多轮 session/cache pool 标识，以及完整 `items` 中新增 item 的起始位置。用户不直接管理 provider response id；response-style adapter 会从历史 item 的 provider snapshot metadata 中查找 response id，并按 provider 语义决定是否发送 suffix。调用语义仍由用户传入的完整 `Item` 序列定义。provider conversation 这类持久化上下文暂不进入通用 core 抽象，prompt/cache retention 与远端过期时间仍通过 provider-specific 能力处理。
+
+`RemoteContextHint.session_key` 的设计目标是表达“这一组请求属于同一个多轮对话缓存池”，而不是表达 `vatbrain` 自身的会话状态。OpenAI 可以将其映射为 `prompt_cache_key`；Volcengine 可以将其映射为 Responses API Session 缓存参数组合；Anthropic 首期仍依赖 automatic cache，并兼容接收该字段。详见 [session-cache-strategy.CN.md](session-cache-strategy.CN.md)。
 
 Full-context First 不等于每次 provider 请求都必须传输完整 input。若用户明确提供 `RemoteContextHint.new_items_start_index`，response-style adapter 可以在边界前一个 item 中找到 response id 时只发送新增 suffix；若找不到 response id，则退化为完整 input。adapter 不能只凭 role、purpose 或 provider item id 猜测哪些 item 是 history、哪些 item 是新增输入。
 

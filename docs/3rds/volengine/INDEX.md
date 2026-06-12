@@ -1,11 +1,11 @@
 # 火山方舟资料索引
 
 状态：第三方资料索引  
-最近更新：2026-05-29
+最近更新：2026-06-12
 
 ## 概览
 
-本目录保存火山方舟相关开发资料的本地快照，用于分析 `vatbrain` 的跨厂商抽象边界。资料覆盖 Chat API、Responses API、Responses API 专题教程、Files API、多模态 embedding、图片/视频理解、图片/视频生成、函数调用、结构化输出、reasoning 与 streaming。
+本目录保存火山方舟相关开发资料的本地快照，用于分析 `vatbrain` 的跨厂商抽象边界。资料覆盖 Chat API、Responses API、Responses API 专题教程、上下文缓存、Files API、多模态 embedding、图片/视频理解、图片/视频生成、函数调用、结构化输出、reasoning 与 streaming。
 
 这些资料是第三方能力事实来源，不是 `vatbrain` 自身设计文档。面向产品设计的归纳请参见 [provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md)。
 
@@ -13,6 +13,8 @@
 
 - [response_api.md](response_api.md)：Responses API 概览，包含与 Chat API 的差异、默认存储、`previous_response_id`、`caching`、结构化输出、内置工具和函数工具差异。
 - [response_api_detail_ref.md](response_api_detail_ref.md)：Responses API 创建请求/响应参数 reference，详细列出 `input` item、`instructions`、`previous_response_id`、`expire_at`、`thinking`、`reasoning`、`include`、`caching`、`store`、采样参数、`text.format`、工具、`tool_choice`、`max_tool_calls` 与 `context_management`。
+- [context_cache.md](context_cache.md)：上下文缓存总览，区分隐式缓存、显式缓存、Session 缓存、前缀缓存、Responses API 与 Context API 的调用方式和生命周期差异。
+- [response_api_context_cache.md](response_api_context_cache.md)：Responses API 上下文缓存专题，覆盖前缀缓存、Session 缓存、`caching`、`previous_response_id`、`expire_at`、cache 链限制和计费说明。
 - [response_api_text_gen.md](response_api_text_gen.md)：Responses API 文本生成专题，包含 Ark SDK 调用、文档中的 OpenAI-compatible 示例对照、`previous_response_id` 分支对话、`store`/`caching`、streaming event、`instructions` 与上下文管理规则；v0.4 实现只采用 Ark SDK。
 - [response_api_multimodal_understanding.md](response_api_multimodal_understanding.md)：Responses API 多模态理解专题，覆盖图片、视频、文档通过 Files API、file id、URL/base64 等方式输入，包含视频预处理 fps、文件处理等待和流式输出示例。
 - [response_api_reasoning.md](response_api_reasoning.md)：Responses API reasoning 专题，说明 `thinking.type`、reasoning summary 流式事件、`reasoning.effort`、`reasoning_tokens`、加密思考内容 include 与模型支持差异。
@@ -54,6 +56,7 @@
 ## 对 vatbrain 的设计提示
 
 - 火山方舟的 Responses API 与 `vatbrain` 的 `Full-context First` 不冲突，但其默认存储、`previous_response_id` 和 `caching` 应被视为 provider-side optimization，而不是核心语义状态。
+- 火山方舟 Responses API Session 缓存依赖 `caching={"type":"enabled"}`、`store`、`previous_response_id` 和 `expire_at` 共同工作；其中 `expire_at` 同时影响 response 存储和 token cache 生命周期，适合由 adapter 封装为受控策略。
 - 火山方舟同时暴露用户执行的 function tools 与 provider-hosted tools，因此 `Tool` 抽象需要表达执行责任。
 - Files API 说明文件资源具有独立生命周期，不能只作为 message content 的一个字符串字段处理。
 - 多模态 embedding 和媒体生成说明 `vatbrain` 需要把 inference、representation、resource、media generation 分成不同 API 家族。

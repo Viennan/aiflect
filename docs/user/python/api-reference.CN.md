@@ -1,12 +1,12 @@
 # Python API 参考
 
-状态：v0.7
+状态：v0.8
 日期：2026-05-13
-最近更新：2026-06-07
+最近更新：2026-06-12
 
 ## 定位
 
-本文是 Python 版本的用户侧 API 参考，覆盖 v0.7 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Anthropic provider 用法见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)；DeepSeek provider 用法见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
+本文是 Python 版本的用户侧 API 参考，覆盖 v0.8 已暴露给用户的主要接口、数据结构和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围。渐进式使用流程见 [quickstart.CN.md](quickstart.CN.md)；Volcengine provider 用法见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)；Anthropic provider 用法见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)；DeepSeek provider 用法见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)；Pydantic structured output 细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
 `vatbrain` 的核心约束：
 
@@ -216,7 +216,7 @@ Anthropic client 方法：
 
 Anthropic adapter 支持文本、图片理解、JSON Schema structured output、Pydantic structured output helper、ReasoningConfig extended thinking、function tools、streaming、async 和 automatic prefix caching。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic 原生参数。
 
-Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ReasoningConfig.include_trace` 或 `reasoning.provider_options`。`ResponseFormat` 会映射为 Anthropic Messages API `output_config.format` JSON Schema。`ReasoningConfig` 会映射为 Anthropic `thinking` 与 `output_config.effort`。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`new_items_start_index` 会被忽略，不触发差分传输。
+Anthropic adapter 不支持 Files API、embedding、media generation、provider-hosted/server tools、SDK Tool Runner、`ReasoningConfig.include_trace` 或 `reasoning.provider_options`。`ResponseFormat` 会映射为 Anthropic Messages API `output_config.format` JSON Schema。`ReasoningConfig` 会映射为 Anthropic `thinking` 与 `output_config.effort`。`RemoteContextHint.enable_cache=True` 会启用 automatic prompt caching；`session_key` 会被兼容接收但不下发；`new_items_start_index` 会被忽略，不触发差分传输。
 
 ### DeepSeekClient
 
@@ -262,7 +262,7 @@ DeepSeek client 方法：
 
 DeepSeek adapter 支持文本生成、streaming、async、function tools、`ReasoningConfig.mode` / `ReasoningConfig.effort` 和 usage 映射。`GenerationConfig.max_output_tokens` 必须设置，或通过 `provider_options["max_tokens"]` 传入 Anthropic-compatible 原生参数。
 
-DeepSeek adapter 不支持 image/document/file/audio/video input、structured output、Pydantic parsed convenience、Files API、embedding、media generation、custom tools、explicit `cache_control` 或可靠禁用 parallel tool calls。`RemoteContextHint.enable_cache=True` 会被兼容接收但不下发 cache control；`new_items_start_index` 会被忽略，不触发差分传输。
+DeepSeek adapter 不支持 image/document/file/audio/video input、structured output、Pydantic parsed convenience、Files API、embedding、media generation、custom tools、explicit `cache_control` 或可靠禁用 parallel tool calls。`RemoteContextHint.enable_cache=True` 与 `session_key` 会被兼容接收但不下发 cache control 或 session 参数；`new_items_start_index` 会被忽略，不触发差分传输。
 
 ## Items
 
@@ -570,6 +570,7 @@ from whero.vatbrain import RemoteContextHint
 
 remote_context = RemoteContextHint(
     enable_cache=True,
+    session_key="chat-thread-42",
     new_items_start_index=4,
 )
 ```
@@ -577,10 +578,11 @@ remote_context = RemoteContextHint(
 字段：
 
 - `enable_cache`：是否启用 provider-side cache/stored response 优化。
+- `session_key`：可选的多轮 session/cache pool 稳定标识。建议使用业务 session id 的 hash 或其他非敏感稳定字符串。
 - `new_items_start_index`：完整 `items` 中新增 item 的起始 index。
 - `provider_options`：provider-specific remote context 参数。
 
-用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching。DeepSeek adapter 兼容接收 `RemoteContextHint`，但不下发 `cache_control`，也不做差分传输。
+用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。`session_key` 在 OpenAI adapter 中映射为 `prompt_cache_key`；在 Volcengine adapter 中启用 adapter-managed Responses API Session cache，自动设置 `caching={"type":"enabled"}` 与 1 小时 `expire_at`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching；`session_key` 当前兼容接收但不下发。DeepSeek adapter 兼容接收 `RemoteContextHint`，但不下发 `cache_control`，也不做差分传输。
 
 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应在目标服务上验证 `previous_response_id` / stored response 链接能力后再使用 `new_items_start_index`。未验证前可以只设置 `enable_cache=True` 或完全不传 `remote_context`，由 adapter 发送完整 `items`；这样不会改变对话语义，只是不会获得 response-id 差分传输优化。
 
@@ -588,9 +590,13 @@ OpenAI/Volcengine 非流式 generation 会在 `GenerationResponse.metadata["remo
 
 - `api_family`: `"responses"`。
 - `cache_enabled`: 本次 request 是否启用 cache。
+- `session_cache_enabled`: 本次 request 是否启用了通用 `session_key` 对应的 session/cache pool 策略。
+- `session_key_present`: 请求中是否提供了 `session_key`；metadata 不包含原始 key。
 - `attempted_previous_response_id`: 初始请求是否携带 `previous_response_id`。
 - `final_request_used_previous_response_id`: 最终成功的请求是否携带 `previous_response_id`。
 - `refreshed_after_invalid_context`: 是否因 previous response/context invalid 或 expired 自动 refresh。
+- `refreshed_before_expiry`: Volcengine session cache 中，是否因为 anchor response 即将过期而主动改用完整 `items`。
+- `previous_response_expire_at`: Volcengine anchor response 的过期时间戳，若 adapter 可从 snapshot 中取得。
 - `new_items_start_index`: 请求中提供的新增 item 起始位置。
 
 当 `attempted_previous_response_id=True`、`final_request_used_previous_response_id=True` 且 `refreshed_after_invalid_context=False` 时，可以确认该次 response-style 请求直接使用 previous response 成功，而不是通过 full-context refresh 兜底成功。
@@ -1353,6 +1359,7 @@ from whero.vatbrain.core.errors import (
 - OpenAI custom tool。
 - tool call result 回填。
 - `RemoteContextHint.enable_cache/new_items_start_index` remote context hint。
+- `RemoteContextHint.session_key` 映射为 Responses API `prompt_cache_key`。
 - 基于 snapshot response id 与新增边界的 OpenAI previous response 差分传输。
 - previous response 失效时的自动 full-context refresh。
 - provider-native item snapshot replay。
@@ -1389,6 +1396,7 @@ from whero.vatbrain.core.errors import (
 - user function tool。
 - function call result 回填。
 - `RemoteContextHint.enable_cache/new_items_start_index` remote context hint。
+- `RemoteContextHint.session_key` 启用 adapter-managed Responses API Session cache，固定 1 小时 `expire_at`，并在 previous response 接近过期时自动 full-context refresh。
 - 基于 snapshot response id 与新增边界的 previous response 差分传输。
 - previous response 失效时的自动 full-context refresh。
 - provider-native item snapshot replay。
@@ -1407,6 +1415,7 @@ from whero.vatbrain.core.errors import (
 - custom tool。
 - provider-hosted tools、remote tools、MCP tools 的稳定通用抽象。
 - provider conversation 持久化上下文抽象。
+- 自定义 generation `expire_at`；Volcengine session cache 生命周期由 adapter 固定为 1 小时。
 - 本地文件隐式上传。
 - 跨 provider replay。
 
@@ -1431,6 +1440,7 @@ from whero.vatbrain.core.errors import (
   - `mode auto/enabled/adaptive` -> `thinking={"type": "adaptive"}`。
   - `effort low/medium/high/max/xhigh` -> `output_config.effort`。
 - `RemoteContextHint.enable_cache=True` 映射为 automatic prefix caching。
+- `RemoteContextHint.session_key` 兼容接收但不下发。
 - `new_items_start_index` 兼容接收但忽略。
 - provider-native content block snapshot replay。
 - usage cache token mapping。
@@ -1471,6 +1481,7 @@ from whero.vatbrain.core.errors import (
 - `ReasoningConfig.mode disabled/none` -> `thinking={"type": "disabled"}`。
 - `ReasoningConfig.effort high/max` -> `output_config.effort`。
 - `RemoteContextHint.enable_cache=True` 兼容接收但不下发 cache control。
+- `RemoteContextHint.session_key` 兼容接收但不下发。
 - `new_items_start_index` 兼容接收但忽略。
 - provider-native content block snapshot replay。
 - usage cache token mapping。

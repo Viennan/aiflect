@@ -208,7 +208,14 @@ class FakeArk:
         )
 
 
-def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
+def _volcengine_anchor(
+    response_id: str = "resp_old",
+    *,
+    response_expire_at: int | None = None,
+) -> MessageItem:
+    metadata = {"response_id": response_id}
+    if response_expire_at is not None:
+        metadata["response_expire_at"] = response_expire_at
     return MessageItem(
         Role.ASSISTANT,
         "covered",
@@ -222,7 +229,7 @@ def _volcengine_anchor(response_id: str = "resp_old") -> MessageItem:
                     "role": "assistant",
                     "content": [{"type": "output_text", "text": "covered"}],
                 },
-                metadata={"response_id": response_id},
+                metadata=metadata,
             )
         ],
     )
@@ -263,13 +270,25 @@ class FakeArkError(Exception):
     }
 
 
-def _raw_response(response_id: str = "resp_1") -> SimpleNamespace:
+def _raw_response(
+    response_id: str = "resp_1",
+    *,
+    created_at: int | None = None,
+    expire_at: int | None = None,
+    caching: object | None = None,
+    store: bool | None = None,
+    output: list[object] | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
         id=response_id,
         model="doubao-test",
         status="completed",
-        output=[],
+        output=[] if output is None else output,
         usage=None,
+        created_at=created_at,
+        expire_at=expire_at,
+        caching=caching,
+        store=store,
     )
 
 
@@ -345,9 +364,12 @@ def test_client_generate_uses_ark_responses_endpoint() -> None:
     assert response.metadata["remote_context"] == {
         "api_family": "responses",
         "cache_enabled": True,
+        "session_cache_enabled": False,
+        "session_key_present": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": True,
         "refreshed_after_invalid_context": False,
+        "refreshed_before_expiry": False,
         "new_items_start_index": 1,
     }
 
@@ -373,9 +395,83 @@ def test_client_generate_refreshes_invalid_remote_context() -> None:
     assert response.metadata["remote_context"] == {
         "api_family": "responses",
         "cache_enabled": True,
+        "session_cache_enabled": False,
+        "session_key_present": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": False,
         "refreshed_after_invalid_context": True,
+        "refreshed_before_expiry": False,
+        "new_items_start_index": 1,
+    }
+
+
+def test_client_generate_uses_session_cache_params(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.time", lambda: 1_800_000_000)
+    fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
+    client = VolcengineClient(client=fake, async_client=object())
+
+    response = client.generate(
+        model="doubao-test",
+        items=[
+            _volcengine_anchor(response_expire_at=1_800_003_700),
+            MessageItem.user("hello"),
+        ],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="session-1",
+            new_items_start_index=1,
+        ),
+    )
+
+    assert fake.responses.calls[0]["previous_response_id"] == "resp_old"
+    assert fake.responses.calls[0]["caching"] == {"type": "enabled"}
+    assert fake.responses.calls[0]["expire_at"] == 1_800_003_600
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "session_cache_enabled": True,
+        "session_key_present": True,
+        "attempted_previous_response_id": True,
+        "final_request_used_previous_response_id": True,
+        "refreshed_after_invalid_context": False,
+        "refreshed_before_expiry": False,
+        "previous_response_expire_at": 1_800_003_700,
+        "new_items_start_index": 1,
+    }
+
+
+def test_client_generate_refreshes_session_cache_before_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.time", lambda: 1_800_000_000)
+    fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
+    client = VolcengineClient(client=fake, async_client=object())
+
+    response = client.generate(
+        model="doubao-test",
+        items=[
+            _volcengine_anchor(response_expire_at=1_800_000_299),
+            MessageItem.user("hello"),
+        ],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="session-1",
+            new_items_start_index=1,
+        ),
+    )
+
+    assert "previous_response_id" not in fake.responses.calls[0]
+    assert len(fake.responses.calls[0]["input"]) == 2
+    assert fake.responses.calls[0]["caching"] == {"type": "enabled"}
+    assert fake.responses.calls[0]["expire_at"] == 1_800_003_600
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "session_cache_enabled": True,
+        "session_key_present": True,
+        "attempted_previous_response_id": False,
+        "final_request_used_previous_response_id": False,
+        "refreshed_after_invalid_context": False,
+        "refreshed_before_expiry": True,
+        "previous_response_expire_at": 1_800_000_299,
         "new_items_start_index": 1,
     }
 
