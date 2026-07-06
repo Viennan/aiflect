@@ -17,6 +17,7 @@
 - [REQ-2026-06-session-cache-strategy.CN.md](requirements/REQ-2026-06-session-cache-strategy.CN.md)：Session cache 策略需求记录，说明 `RemoteContextHint.session_key`、OpenAI `prompt_cache_key`、Volcengine Responses API Session 缓存与 1h 生命周期管理的实现状态。
 - [REQ-2026-06-python-deepseek-provider.CN.md](requirements/REQ-2026-06-python-deepseek-provider.CN.md)：Python DeepSeek provider 需求记录，说明 Anthropic 兼容接口、`api_format` 初始化参数、reasoning、工具、cache hint 兼容和 OpenAI completion 预留状态。
 - [REQ-2026-07-package-rename-aiflect.CN.md](requirements/REQ-2026-07-package-rename-aiflect.CN.md)：Package rename 需求记录，说明旧项目名迁移到 `aiflect` 后的公开包名、导入路径、目录、错误基类、环境变量前缀和文档同步范围。
+- [REQ-2026-07-openai-response-delta-adapter-options.CN.md](requirements/REQ-2026-07-openai-response-delta-adapter-options.CN.md)：OpenAI response delta adapter options 需求记录，说明 `ClientConfig.adapter_options` 的 wrapper 行为配置定位、OpenAI `response_delta=False` 禁用 previous-response 差分传输和文档/测试同步范围。
 
 ## Design
 

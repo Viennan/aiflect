@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aiflect Submission"
+  short_description: "Commit, push, and prepare PR/MR submissions for aiflect work."
+  default_prompt: "Commit and submit the current aiflect work."

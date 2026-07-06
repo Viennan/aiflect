@@ -267,6 +267,8 @@ def test_client_generate_uses_explicit_model_and_common_options() -> None:
         "cache_enabled": True,
         "session_cache_enabled": False,
         "session_key_present": False,
+        "response_delta_mode": "auto",
+        "response_delta_disabled_by_adapter_options": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": True,
         "refreshed_after_invalid_context": False,
@@ -309,9 +311,59 @@ def test_client_generate_refreshes_invalid_remote_context() -> None:
         "cache_enabled": True,
         "session_cache_enabled": False,
         "session_key_present": False,
+        "response_delta_mode": "auto",
+        "response_delta_disabled_by_adapter_options": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": False,
         "refreshed_after_invalid_context": True,
+        "new_items_start_index": 1,
+    }
+
+
+def test_client_generate_can_disable_response_delta_with_adapter_options() -> None:
+    raw_response = SimpleNamespace(
+        id="resp_1",
+        model="gpt-test",
+        status="completed",
+        output=[],
+        usage=None,
+    )
+    fake = FakeOpenAI(response=raw_response)
+    client = OpenAIClient(
+        config=ClientConfig(
+            api_key="test",
+            adapter_options={"remote_context": {"response_delta": False}},
+        ),
+        client=fake,
+        async_client=object(),
+    )
+
+    response = client.generate(
+        model="gpt-test",
+        items=[_openai_anchor(), MessageItem.user("hello")],
+        remote_context=RemoteContextHint(
+            enable_cache=True,
+            session_key="cache-key",
+            new_items_start_index=1,
+        ),
+    )
+
+    assert "previous_response_id" not in fake.responses.calls[0]
+    assert fake.responses.calls[0]["store"] is True
+    assert fake.responses.calls[0]["prompt_cache_key"] == "cache-key"
+    assert len(fake.responses.calls[0]["input"]) == 2
+    assert fake.responses.calls[0]["input"][0]["role"] == "assistant"
+    assert fake.responses.calls[0]["input"][1]["role"] == "user"
+    assert response.metadata["remote_context"] == {
+        "api_family": "responses",
+        "cache_enabled": True,
+        "session_cache_enabled": True,
+        "session_key_present": True,
+        "response_delta_mode": "disabled",
+        "response_delta_disabled_by_adapter_options": True,
+        "attempted_previous_response_id": False,
+        "final_request_used_previous_response_id": False,
+        "refreshed_after_invalid_context": False,
         "new_items_start_index": 1,
     }
 
@@ -401,6 +453,8 @@ async def test_async_client_generate_replays_without_remote_context_when_enabled
         "cache_enabled": True,
         "session_cache_enabled": False,
         "session_key_present": False,
+        "response_delta_mode": "auto",
+        "response_delta_disabled_by_adapter_options": False,
         "attempted_previous_response_id": True,
         "final_request_used_previous_response_id": False,
         "refreshed_after_invalid_context": True,
@@ -646,6 +700,7 @@ def test_client_common_init_options_are_collected() -> None:
             base_url="https://example.test/v1",
             timeout=30.0,
             max_retries=1,
+            adapter_options={"remote_context": {"response_delta": False}},
             provider_options={"default_headers": {"x-config": "yes"}},
         ),
         api_key="explicit",
@@ -661,6 +716,7 @@ def test_client_common_init_options_are_collected() -> None:
         "default_headers": {"x-config": "yes"},
         "organization": "org_1",
     }
+    assert client._adapter_options == {"remote_context": {"response_delta": False}}
     assert repr(client._client_options["api_key"]) == "SecretString('********')"
 
 

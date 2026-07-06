@@ -2,7 +2,7 @@
 
 状态：Completed  
 日期：2026-06-06  
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## 目标模型
 
@@ -43,6 +43,31 @@ OpenAI 与 Volcengine generation mapper 使用相同策略：
 
 Provider options 中的 `previous_response_id` 与 `store` 是保留字段；用户应通过 `RemoteContextHint` 控制这些行为。
 
+## OpenAI Adapter Options
+
+`ClientConfig.adapter_options` 是 aiflect provider wrapper 的行为配置字典，不属于 provider SDK 参数。Core 只保存该字典，不解析其中字段；各 provider wrapper 自行决定是否识别某些 key。
+
+当前只有 OpenAI client 识别以下配置：
+
+```python
+ClientConfig(
+    adapter_options={
+        "remote_context": {
+            "response_delta": False,
+        },
+    },
+)
+```
+
+当 `response_delta=False` 时，OpenAI client 调用 mapper 时使用 `use_remote_context=False`：
+
+- 不发送 `previous_response_id`。
+- 使用完整 `GenerationRequest.items` 构造 Responses API input。
+- 保留 `RemoteContextHint.enable_cache=True` 对应的 `store=True`。
+- 保留 `RemoteContextHint.session_key` 对应的 `prompt_cache_key`。
+
+这用于兼容部分 OpenAI-compatible route、网关或 API provider 对 Responses API previous-response 链接能力支持不稳定的情况。Volcengine、Anthropic 与 DeepSeek 当前不读取该 `adapter_options` key。
+
 ## 失效恢复
 
 OpenAI 与 Volcengine client 在第一次请求实际携带 `previous_response_id`，且 provider SDK/服务错误可识别为 previous response/context invalid 或 expired 时，自动构造 full-context refresh attempt：
@@ -55,7 +80,7 @@ OpenAI 与 Volcengine client 在第一次请求实际携带 `previous_response_i
 
 ## 可观测性
 
-OpenAI 与 Volcengine 的非流式 generation response 会在 `GenerationResponse.metadata["remote_context"]` 中记录 response-style remote context 的请求路径：
+OpenAI 与 Volcengine 的非流式 generation response 会在 `GenerationResponse.metadata["remote_context"]` 中记录 response-style remote context 的请求路径。通用字段：
 
 - `api_family`: `"responses"`。
 - `cache_enabled`: 本次 request 中 `RemoteContextHint.enable_cache` 的值。
@@ -65,6 +90,11 @@ OpenAI 与 Volcengine 的非流式 generation response 会在 `GenerationRespons
 - `final_request_used_previous_response_id`: 最终成功的请求是否携带 `previous_response_id`。
 - `refreshed_after_invalid_context`: 是否因为 previous response/context invalid 或 expired 执行了 full-context refresh。
 - `new_items_start_index`: 用户提供该 hint 时记录其值。
+
+OpenAI client 额外记录：
+
+- `response_delta_mode`: response delta 策略，当前为 `"auto"` 或 `"disabled"`。
+- `response_delta_disabled_by_adapter_options`: 是否因 `ClientConfig.adapter_options` 主动禁用了 response delta。
 
 costly 多轮测试使用该 metadata 确认第二轮 response-style 请求确实通过第一轮 response id 成功完成，而不是被自动 full-context refresh 兜底。
 

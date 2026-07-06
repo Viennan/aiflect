@@ -54,6 +54,8 @@ from whero.aiflect.providers.openai.mapper import (
 )
 from whero.aiflect.providers.openai.stream import from_openai_stream_event
 
+_DISABLED_RESPONSE_DELTA_VALUES = frozenset({"0", "disabled", "false", "full_context", "no", "off"})
+
 
 @dataclass(frozen=True, slots=True)
 class _GenerationCreateResult:
@@ -89,6 +91,7 @@ class OpenAIClient:
             max_retries=max_retries,
             provider_options=openai_client_options,
         )
+        self._adapter_options = _adapter_options(config)
         _validate_client_credentials(
             client=client,
             async_client=async_client,
@@ -494,7 +497,8 @@ class OpenAIClient:
         return get_model_capability(model, overrides=merged_overrides or None)
 
     def _create_generation_response(self, request: GenerationRequest, *, message: str) -> _GenerationCreateResult:
-        params = to_openai_generation_params(request)
+        use_response_delta = _response_delta_enabled(self._adapter_options)
+        params = to_openai_generation_params(request, use_remote_context=use_response_delta)
         try:
             response = self._sync_client.responses.create(**params)
             return _generation_create_result(
@@ -503,6 +507,7 @@ class OpenAIClient:
                 initial_params=params,
                 final_params=params,
                 refreshed_after_invalid_context=False,
+                response_delta_enabled=use_response_delta,
             )
         except Exception as exc:
             if not _should_refresh_remote_context(params, exc):
@@ -516,6 +521,7 @@ class OpenAIClient:
                     initial_params=params,
                     final_params=retry_params,
                     refreshed_after_invalid_context=True,
+                    response_delta_enabled=use_response_delta,
                 )
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
@@ -526,7 +532,8 @@ class OpenAIClient:
         *,
         message: str,
     ) -> _GenerationCreateResult:
-        params = to_openai_generation_params(request)
+        use_response_delta = _response_delta_enabled(self._adapter_options)
+        params = to_openai_generation_params(request, use_remote_context=use_response_delta)
         try:
             response = await self._async_openai_client.responses.create(**params)
             return _generation_create_result(
@@ -535,6 +542,7 @@ class OpenAIClient:
                 initial_params=params,
                 final_params=params,
                 refreshed_after_invalid_context=False,
+                response_delta_enabled=use_response_delta,
             )
         except Exception as exc:
             if not _should_refresh_remote_context(params, exc):
@@ -548,12 +556,14 @@ class OpenAIClient:
                     initial_params=params,
                     final_params=retry_params,
                     refreshed_after_invalid_context=True,
+                    response_delta_enabled=use_response_delta,
                 )
             except Exception as retry_exc:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
 
     def _create_generation_stream(self, request: GenerationRequest, *, message: str) -> Any:
-        params = to_openai_generation_params(request, stream=True)
+        use_response_delta = _response_delta_enabled(self._adapter_options)
+        params = to_openai_generation_params(request, stream=True, use_remote_context=use_response_delta)
         try:
             return self._sync_client.responses.create(**params)
         except Exception as exc:
@@ -566,7 +576,8 @@ class OpenAIClient:
                 raise _provider_request_error(message, "responses.create", retry_exc) from retry_exc
 
     async def _acreate_generation_stream(self, request: GenerationRequest, *, message: str) -> Any:
-        params = to_openai_generation_params(request, stream=True)
+        use_response_delta = _response_delta_enabled(self._adapter_options)
+        params = to_openai_generation_params(request, stream=True, use_remote_context=use_response_delta)
         try:
             return await self._async_openai_client.responses.create(**params)
         except Exception as exc:
@@ -649,6 +660,22 @@ def _merge_client_options(
     return options
 
 
+def _adapter_options(config: ClientConfig | None) -> dict[str, Any]:
+    return dict(config.adapter_options or {}) if config else {}
+
+
+def _response_delta_enabled(adapter_options: Mapping[str, Any]) -> bool:
+    remote_context_options = adapter_options.get("remote_context", {})
+    if not isinstance(remote_context_options, Mapping):
+        return True
+    mode = remote_context_options.get("response_delta", "auto")
+    if mode is None:
+        return True
+    if isinstance(mode, str):
+        return mode.strip().lower() not in _DISABLED_RESPONSE_DELTA_VALUES
+    return bool(mode)
+
+
 def _validate_client_credentials(
     *,
     client: Any | None,
@@ -705,6 +732,7 @@ def _generation_create_result(
     initial_params: Mapping[str, Any],
     final_params: Mapping[str, Any],
     refreshed_after_invalid_context: bool,
+    response_delta_enabled: bool,
 ) -> _GenerationCreateResult:
     return _GenerationCreateResult(
         response=response,
@@ -713,6 +741,7 @@ def _generation_create_result(
             initial_params=initial_params,
             final_params=final_params,
             refreshed_after_invalid_context=refreshed_after_invalid_context,
+            response_delta_enabled=response_delta_enabled,
         ),
     )
 
@@ -723,6 +752,7 @@ def _response_style_remote_context_metadata(
     initial_params: Mapping[str, Any],
     final_params: Mapping[str, Any],
     refreshed_after_invalid_context: bool,
+    response_delta_enabled: bool,
 ) -> dict[str, Any]:
     if request.remote_context is None:
         return {}
@@ -731,6 +761,8 @@ def _response_style_remote_context_metadata(
         "cache_enabled": request.remote_context.enable_cache,
         "session_cache_enabled": bool(request.remote_context.enable_cache and request.remote_context.session_key),
         "session_key_present": request.remote_context.session_key is not None,
+        "response_delta_mode": "auto" if response_delta_enabled else "disabled",
+        "response_delta_disabled_by_adapter_options": not response_delta_enabled,
         "attempted_previous_response_id": bool(initial_params.get("previous_response_id")),
         "final_request_used_previous_response_id": bool(final_params.get("previous_response_id")),
         "refreshed_after_invalid_context": refreshed_after_invalid_context,

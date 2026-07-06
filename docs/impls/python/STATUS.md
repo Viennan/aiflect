@@ -35,7 +35,7 @@ Python 是 `aiflect` 的参考实现语言。当前实现已完成 v0.9 Package 
 
 - Python 包脚手架与 `pyproject.toml`。
 - Python package name 为 `aiflect`，import 路径为 `whero.aiflect`，distribution name 为 `whero-aiflect`。
-- 通用 client 初始化配置：`ClientConfig`。
+- 通用 client 初始化配置：`ClientConfig`，包含 provider SDK 初始化参数与 wrapper 行为配置 `adapter_options`。
 - `SecretString`：provider adapter 用于存储 LLM API key。
 - OpenAI / Volcengine / Anthropic / DeepSeek adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
 - 默认单元测试不依赖真实 provider API。
@@ -108,6 +108,7 @@ Python 是 `aiflect` 的参考实现语言。当前实现已完成 v0.9 Package 
   - `RemoteContextHint.session_key` 映射为 OpenAI Responses API `prompt_cache_key`。
   - output item snapshot metadata 保存 parent response id。
   - 找到 anchor response id 时 optimized attempt 发送 suffix。
+  - `ClientConfig.adapter_options["remote_context"]["response_delta"] = False` 可关闭 OpenAI previous response 差分传输。
   - previous response 失效时自动 refresh 并重新构造完整 input。
 - OpenAI text embeddings。
 - OpenAI Images API：
