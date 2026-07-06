@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aiflect Implementation"
+  short_description: "Develop aiflect code and public behavior"
+  default_prompt: "Use $aiflect-implementation to implement a scoped aiflect code change."
