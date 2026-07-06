@@ -28,6 +28,7 @@
   - 同步/异步 embedding。
   - 直接 Images API 图片生成、参考图生成与图片流式生成。
   - `RemoteContextHint.session_key` 映射为 Responses API `prompt_cache_key`。
+  - `ClientConfig.adapter_options["remote_context"]["response_delta"] = False` 可关闭 OpenAI previous response 差分传输。
   - capability 查询。
 - Volcengine provider client：
   - `whero-aiflect[volcengine]` optional dependency。

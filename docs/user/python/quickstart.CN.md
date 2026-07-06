@@ -156,9 +156,21 @@ response = client.generate(
 - `new_items_start_index` 表示完整 `items` 中从哪里开始是本轮新增 item。
 - OpenAI/Volcengine adapter 会从边界前一个 item 的 provider snapshot metadata 中读取 response id；找到时只向 provider 发送追加 suffix，找不到时发送完整 `items`。
 - Volcengine session cache 由 adapter 管理 `caching` 与 `expire_at`，固定 1 小时生命周期；当 previous response 接近过期时会自动改用完整 `items`。
-- 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应先验证其支持 `previous_response_id` / stored response 链接能力，再使用 `new_items_start_index`；未验证前可以只启用 `enable_cache=True` 或不传 `remote_context`，保持完整 `items` 请求。
+- 如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，且其 `previous_response_id` / stored response 链接能力不稳定，可以通过 `ClientConfig.adapter_options` 关闭 OpenAI adapter 的自动 response delta 传输，业务代码仍可继续传入 `new_items_start_index`。
 - Anthropic adapter 忽略 `new_items_start_index`；`RemoteContextHint.enable_cache=True` 会开启 automatic prompt caching，且仍发送完整上下文。
 - response id 由 adapter 写入 provider snapshot metadata，用户不需要保存或传回。
+
+```python
+from whero.aiflect import ClientConfig
+from whero.aiflect.providers.openai import OpenAIClient
+
+client = OpenAIClient(
+    config=ClientConfig(
+        api_key="...",
+        adapter_options={"remote_context": {"response_delta": False}},
+    ),
+)
+```
 
 Provider 返回的 output item 会在 `provider_snapshots` 字段保留原始 payload。OpenAI adapter 默认优先使用 snapshot 做同 provider 高保真重放，以保留 OpenAI `phase` 等原生字段。手工构造 assistant 历史消息时可使用通用 `AssistantMessagePhase`：
 

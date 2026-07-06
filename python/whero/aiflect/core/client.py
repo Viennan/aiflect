@@ -44,10 +44,13 @@ class ClientConfig:
     timeout: float | None = None
     max_retries: int | None = None
     provider_options: dict[str, Any] | None = None
+    adapter_options: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.api_key is not None:
             object.__setattr__(self, "api_key", to_secret_string(self.api_key))
+        if self.adapter_options is not None:
+            object.__setattr__(self, "adapter_options", dict(self.adapter_options))
         if self.provider_options is not None:
             object.__setattr__(
                 self,

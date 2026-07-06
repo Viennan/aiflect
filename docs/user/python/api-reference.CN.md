@@ -53,6 +53,7 @@ config = ClientConfig(
     timeout=30.0,
     max_retries=2,
     provider_options={"default_headers": {"x-trace-id": "demo"}},
+    adapter_options={},
 )
 ```
 
@@ -63,6 +64,7 @@ config = ClientConfig(
 - `timeout`：provider SDK 超时配置。
 - `max_retries`：provider SDK 重试配置。
 - `provider_options`：透传给 provider SDK client 初始化的额外参数。
+- `adapter_options`：控制 aiflect provider wrapper 自身行为的字典，不会传给 provider SDK。Core 只保存该字典；具体 key 由各 provider wrapper 自行定义。
 
 ### OpenAIClient
 
@@ -584,9 +586,27 @@ remote_context = RemoteContextHint(
 
 用户仍必须传入完整 `items`。OpenAI/Volcengine adapter 在 `enable_cache=True` 且边界前一个 item 的 provider snapshot metadata 中存在 response id 时，只向 provider 发送新增 suffix；如果 response id 缺失或失效，则会重新使用完整 `items`。`session_key` 在 OpenAI adapter 中映射为 `prompt_cache_key`；在 Volcengine adapter 中启用 adapter-managed Responses API Session cache，自动设置 `caching={"type":"enabled"}` 与 1 小时 `expire_at`。Anthropic adapter 忽略 `new_items_start_index`，只在 `enable_cache=True` 时启用 automatic prompt caching；`session_key` 当前兼容接收但不下发。DeepSeek adapter 兼容接收 `RemoteContextHint`，但不下发 `cache_control`，也不做差分传输。
 
-如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，应在目标服务上验证 `previous_response_id` / stored response 链接能力后再使用 `new_items_start_index`。未验证前可以只设置 `enable_cache=True` 或完全不传 `remote_context`，由 adapter 发送完整 `items`；这样不会改变对话语义，只是不会获得 response-id 差分传输优化。
+如果通过路由商、网关或 OpenAI-compatible 服务间接调用 OpenAI Responses API，且目标服务的 `previous_response_id` / stored response 链接能力不稳定，可以在 OpenAI client 初始化时关闭 OpenAI adapter 的自动 response delta 传输：
 
-OpenAI/Volcengine 非流式 generation 会在 `GenerationResponse.metadata["remote_context"]` 中记录 response-style remote context 的请求路径：
+```python
+from whero.aiflect import ClientConfig
+from whero.aiflect.providers.openai import OpenAIClient
+
+client = OpenAIClient(
+    config=ClientConfig(
+        api_key="...",
+        adapter_options={
+            "remote_context": {
+                "response_delta": False,
+            },
+        },
+    ),
+)
+```
+
+关闭后，用户代码仍可继续传入 `RemoteContextHint(enable_cache=True, session_key=..., new_items_start_index=...)`；OpenAI adapter 会发送完整 `items`，不发送 `previous_response_id`，但仍保留 `store=True` 与 `prompt_cache_key` 等 cache/session 参数。该 `adapter_options` key 当前只由 OpenAI adapter 识别；其他 provider wrapper 不保证识别或复用同名 key。
+
+OpenAI/Volcengine 非流式 generation 会在 `GenerationResponse.metadata["remote_context"]` 中记录 response-style remote context 的请求路径。常见字段包括：
 
 - `api_family`: `"responses"`。
 - `cache_enabled`: 本次 request 是否启用 cache。
@@ -598,6 +618,11 @@ OpenAI/Volcengine 非流式 generation 会在 `GenerationResponse.metadata["remo
 - `refreshed_before_expiry`: Volcengine session cache 中，是否因为 anchor response 即将过期而主动改用完整 `items`。
 - `previous_response_expire_at`: Volcengine anchor response 的过期时间戳，若 adapter 可从 snapshot 中取得。
 - `new_items_start_index`: 请求中提供的新增 item 起始位置。
+
+OpenAI adapter 额外记录：
+
+- `response_delta_mode`: 本次 response delta 策略，当前为 `"auto"` 或 `"disabled"`。
+- `response_delta_disabled_by_adapter_options`: 是否因 `ClientConfig.adapter_options` 主动禁用了 response delta。
 
 当 `attempted_previous_response_id=True`、`final_request_used_previous_response_id=True` 且 `refreshed_after_invalid_context=False` 时，可以确认该次 response-style 请求直接使用 previous response 成功，而不是通过 full-context refresh 兜底成功。
 
@@ -1361,6 +1386,7 @@ from whero.aiflect.core.errors import (
 - `RemoteContextHint.enable_cache/new_items_start_index` remote context hint。
 - `RemoteContextHint.session_key` 映射为 Responses API `prompt_cache_key`。
 - 基于 snapshot response id 与新增边界的 OpenAI previous response 差分传输。
+- `ClientConfig.adapter_options["remote_context"]["response_delta"] = False` 可关闭 OpenAI previous response 差分传输。
 - previous response 失效时的自动 full-context refresh。
 - provider-native item snapshot replay。
 - OpenAI assistant message `phase` 与 `AssistantMessagePhase`。
