@@ -58,7 +58,8 @@ specialized workflow.
 - When creating a remote PR or MR, include a description summary whenever the
   platform supports one. If the summary cannot be attached directly, include a
   copyable summary in the final response and use PR/MR-renderable documentation
-  links.
+  links. For GitHub, use full URLs pinned to a commit SHA rather than relative
+  paths.
 - Do not modify files under `docs` unless the user request includes that work or
   the user grants permission. If design documents and code conflict, report the
   conflict before changing direction.

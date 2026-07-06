@@ -70,13 +70,21 @@ forge:
 - Add links to relevant `docs/requirements` records when they exist and are
   useful reading guides.
 - Format documentation links so they render correctly in the target PR/MR
-  platform. Prefer repository-relative Markdown links from the repository root,
-  such as `[REQ-2026-06-example](docs/requirements/REQ-2026-06-example.md)`, or
-  use canonical platform web URLs when a relative link is ambiguous.
+  platform.
+- For GitHub pull-request descriptions, do not use repository-relative links.
+  Use full GitHub URLs pinned to a commit SHA, for example
+  `[REQ-2026-06-example](https://github.com/<owner>/<repo>/blob/<commit-sha>/docs/requirements/REQ-2026-06-example.md)`.
+- Prefer the commit being submitted, such as `git rev-parse HEAD` after the
+  final commit exists, so documentation links remain stable even if branches
+  move.
+- For non-GitHub platforms, use platform-compatible full URLs whenever relative
+  links may not render reliably.
 - Do not use local filesystem links, editor links, or absolute workspace paths
   in PR/MR descriptions.
 - If the remote tool cannot attach a description directly, include a copyable
-  PR/MR summary in the final response so the user can paste it manually.
+  PR/MR summary in the final response so the user can paste it manually. Build
+  any GitHub documentation links in that final response from the final pushed
+  commit SHA when possible.
 
 ## Python Reference Implementation
 
