@@ -1,6 +1,6 @@
 ---
 name: aiflect-implementation
-description: Use when implementing, modifying, reviewing, or planning aiflect non-test code, provider adapters, public Python APIs, packaging, scripts, Git branch setup, remote PR/MR submission, or behavior changes. Covers the mental-model-first development workflow, main-branch synchronization, feature branch creation, Python 3.12 conventions, documentation checkpoints, provider-boundary expectations, and scoped implementation practice.
+description: Use when implementing, modifying, reviewing, or planning aiflect non-test code, provider adapters, public Python APIs, packaging, scripts, Git branch setup, or behavior changes. Covers the mental-model-first development workflow, main-branch synchronization, feature branch creation, Python 3.12 conventions, documentation checkpoints, provider-boundary expectations, and scoped implementation practice. For commit, push, remote submission, or PR/MR description work, load aiflect-submission.
 ---
 
 # Aiflect Implementation
@@ -34,6 +34,8 @@ description: Use when implementing, modifying, reviewing, or planning aiflect no
    - Load `$aiflect-testing` before adding, running, or diagnosing tests.
    - Do not run live provider, credentialed, network, or billable checks unless
      the user explicitly asks.
+6. When the user asks to commit, push, submit to a remote, or create/update a
+   PR/MR, load `$aiflect-submission` and follow that submission checklist.
 
 ## Git Branching and Remote Workflow
 
@@ -61,30 +63,9 @@ the user explicitly specifies a development branch.
   detached HEAD state make the safe path unclear, explain the state and ask
   before switching branches or altering history.
 
-When submitting to a remote hosting system such as GitHub, GitLab, or a similar
-forge:
-
-- Include a PR or MR description summary whenever the platform supports one.
-- Summarize the user-visible change, implementation notes, and validation
-  performed.
-- Add links to relevant `docs/requirements` records when they exist and are
-  useful reading guides.
-- Format documentation links so they render correctly in the target PR/MR
-  platform.
-- For GitHub pull-request descriptions, do not use repository-relative links.
-  Use full GitHub URLs pinned to a commit SHA, for example
-  `[REQ-2026-06-example](https://github.com/<owner>/<repo>/blob/<commit-sha>/docs/requirements/REQ-2026-06-example.md)`.
-- Prefer the commit being submitted, such as `git rev-parse HEAD` after the
-  final commit exists, so documentation links remain stable even if branches
-  move.
-- For non-GitHub platforms, use platform-compatible full URLs whenever relative
-  links may not render reliably.
-- Do not use local filesystem links, editor links, or absolute workspace paths
-  in PR/MR descriptions.
-- If the remote tool cannot attach a description directly, include a copyable
-  PR/MR summary in the final response so the user can paste it manually. Build
-  any GitHub documentation links in that final response from the final pushed
-  commit SHA when possible.
+Submission to a remote hosting system such as GitHub, GitLab, or a similar
+forge is owned by `$aiflect-submission`. Load it before staging, committing,
+pushing, creating a PR/MR, or preparing a PR/MR description.
 
 ## Python Reference Implementation
 

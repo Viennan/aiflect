@@ -14,6 +14,9 @@ specialized workflow.
 
 - Load `.agents/skills/aiflect-implementation` before implementing, reviewing,
   or planning non-test code changes.
+- Load `.agents/skills/aiflect-submission` before committing, pushing,
+  submitting to a remote, creating or updating PR/MR, or preparing PR/MR
+  descriptions.
 - Load `.agents/skills/aiflect-knowledge-base` before working in `docs`,
   entering `design mode`, updating requirements, or reconciling design and code.
 - Load `.agents/skills/aiflect-testing` before adding, running, or diagnosing
