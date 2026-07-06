@@ -69,8 +69,14 @@ forge:
   performed.
 - Add links to relevant `docs/requirements` records when they exist and are
   useful reading guides.
-- If the remote tool cannot attach a description directly, provide the summary
-  text to the user alongside the submit command or result.
+- Format documentation links so they render correctly in the target PR/MR
+  platform. Prefer repository-relative Markdown links from the repository root,
+  such as `[REQ-2026-06-example](docs/requirements/REQ-2026-06-example.md)`, or
+  use canonical platform web URLs when a relative link is ambiguous.
+- Do not use local filesystem links, editor links, or absolute workspace paths
+  in PR/MR descriptions.
+- If the remote tool cannot attach a description directly, include a copyable
+  PR/MR summary in the final response so the user can paste it manually.
 
 ## Python Reference Implementation
 

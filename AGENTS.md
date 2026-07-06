@@ -56,7 +56,9 @@ specialized workflow.
   branch from updated `main`, and ask before continuing on a non-`main` branch
   unless the user explicitly named that branch.
 - When creating a remote PR or MR, include a description summary whenever the
-  platform supports one.
+  platform supports one. If the summary cannot be attached directly, include a
+  copyable summary in the final response and use PR/MR-renderable documentation
+  links.
 - Do not modify files under `docs` unless the user request includes that work or
   the user grants permission. If design documents and code conflict, report the
   conflict before changing direction.
