@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aiflect Knowledge Base"
+  short_description: "Maintain aiflect docs and design records"
+  default_prompt: "Use $aiflect-knowledge-base to update or reason over aiflect knowledge-base documents."
