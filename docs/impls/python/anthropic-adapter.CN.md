@@ -14,7 +14,7 @@ Anthropic adapter 是 generation-only provider adapter。它使用官方 Anthrop
 
 已完成：
 
-- `whero.vatbrain.providers.anthropic.AnthropicClient`。
+- `whero.aiflect.providers.anthropic.AnthropicClient`。
 - `anthropic` optional dependency。
 - `to_anthropic_generation_params()` 与 `from_anthropic_generation_response()`。
 - `from_anthropic_stream_event()`。
@@ -47,7 +47,7 @@ anthropic = [
 新增 provider package：
 
 ```text
-python/whero/vatbrain/providers/anthropic/
+python/whero/aiflect/providers/anthropic/
 - __init__.py
 - client.py
 - mapper.py
@@ -301,7 +301,7 @@ output_config.format.type = "json_schema"
 }
 ```
 
-`ResponseFormat.json_schema_name`、`json_schema_description` 与 `json_schema_strict` 保留 vatbrain 侧语义，不映射到 Anthropic payload 中未明确支持的字段。Pydantic helper 的 strict schema normalization 仍会体现在 `json_schema` body 中。
+`ResponseFormat.json_schema_name`、`json_schema_description` 与 `json_schema_strict` 保留 aiflect 侧语义，不映射到 Anthropic payload 中未明确支持的字段。Pydantic helper 的 strict schema normalization 仍会体现在 `json_schema` body 中。
 
 实现不调用 Anthropic SDK `messages.parse()`；该 SDK helper 只作为体验参考，adapter 仍走 `messages.create`，保持 request/response mapping、provider-native snapshot、streaming 和 Pydantic helper 的统一行为。
 
@@ -555,7 +555,7 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 
 ### 为什么 `RemoteContextHint.enable_cache=True` 能映射为 prompt caching？
 
-在 `vatbrain` 的通用语义里，`enable_cache` 表达 provider-side state/cache/store 的优化意图。Anthropic 没有 Responses previous response 差分语义，但 automatic prefix caching 正好是 provider-side 前缀复用优化。
+在 `aiflect` 的通用语义里，`enable_cache` 表达 provider-side state/cache/store 的优化意图。Anthropic 没有 Responses previous response 差分语义，但 automatic prefix caching 正好是 provider-side 前缀复用优化。
 
 ### 为什么不支持 `FunctionToolType.CUSTOM`？
 
@@ -563,7 +563,7 @@ Anthropic 不使用 response-style `previous_response_id`，所以不需要 `_sh
 
 ### 为什么不调用 Anthropic SDK `messages.parse()`？
 
-`messages.parse()` 是 Anthropic Python SDK 的便捷层，会把输出格式转换为 `output_config.format`。`vatbrain` 需要保持 provider-neutral 的 `ResponseFormat`、response mapping、snapshot、streaming 和 Pydantic helper 行为，所以直接调用 `messages.create` 并在 mapper 中显式构造 `output_config.format`。
+`messages.parse()` 是 Anthropic Python SDK 的便捷层，会把输出格式转换为 `output_config.format`。`aiflect` 需要保持 provider-neutral 的 `ResponseFormat`、response mapping、snapshot、streaming 和 Pydantic helper 行为，所以直接调用 `messages.create` 并在 mapper 中显式构造 `output_config.format`。
 
 ## 参考资料
 

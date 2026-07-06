@@ -1,7 +1,7 @@
 # Python 实现文档索引
 
 状态：持续维护
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## 定位
 
@@ -20,6 +20,7 @@
 - [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)：Remote Context 与 Cache 策略实现记录，覆盖 `RemoteContextHint.enable_cache/new_items_start_index`、snapshot response id、response-style suffix/refresh 与 Anthropic automatic cache。
 - [session-cache-strategy.CN.md](session-cache-strategy.CN.md)：Session Cache 策略实现记录，说明 `RemoteContextHint.session_key`、OpenAI `prompt_cache_key`、Volcengine Responses API Session cache、1h 生命周期和过期前 refresh。
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)：Media generation 实现方案与实现记录，覆盖 OpenAI Images API、Volcengine Ark Images API 和 Volcengine Content Generation 视频任务。
+- [package-rename-aiflect.CN.md](package-rename-aiflect.CN.md)：Package rename 实现记录，说明 Python 包路径、分发名、错误基类和环境变量前缀从旧项目名迁移到 `aiflect` 的影响面。
 
 ### Provider Adapters
 
@@ -43,3 +44,4 @@
 - [REQ-2026-06-remote-context-cache-strategy.CN.md](../../requirements/REQ-2026-06-remote-context-cache-strategy.CN.md)：RemoteContextHint 与缓存策略升级需求记录。
 - [REQ-2026-06-session-cache-strategy.CN.md](../../requirements/REQ-2026-06-session-cache-strategy.CN.md)：Session cache 策略需求记录。
 - [REQ-2026-06-python-deepseek-provider.CN.md](../../requirements/REQ-2026-06-python-deepseek-provider.CN.md)：Python DeepSeek provider 需求记录。
+- [REQ-2026-07-package-rename-aiflect.CN.md](../../requirements/REQ-2026-07-package-rename-aiflect.CN.md)：Package rename 需求记录。

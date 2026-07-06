@@ -8,7 +8,7 @@
 
 Python Anthropic adapter 已完成 Messages API generation、streaming、图片理解、structured output、function tools 和 automatic prefix caching。此前 adapter 能映射 provider 返回的 `thinking` / `redacted_thinking` content block，但请求侧 `ReasoningConfig` 会被拒绝。
 
-Anthropic Messages API 当前通过 `thinking` 开启 extended thinking，通过 `output_config.effort` 表达 effort。`vatbrain` 已有通用 `ReasoningConfig`，因此本需求不新增 core 字段，只在 Anthropic provider-local mapper 中补齐请求映射。
+Anthropic Messages API 当前通过 `thinking` 开启 extended thinking，通过 `output_config.effort` 表达 effort。`aiflect` 已有通用 `ReasoningConfig`，因此本需求不新增 core 字段，只在 Anthropic provider-local mapper 中补齐请求映射。
 
 ## 目标
 

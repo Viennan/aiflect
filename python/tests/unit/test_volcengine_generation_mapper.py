@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     FilePart,
     FunctionCallItem,
     FunctionResultItem,
@@ -27,8 +27,8 @@ from whero.vatbrain import (
     ToolSpec,
     VideoPart,
 )
-from whero.vatbrain.core.errors import UnsupportedCapabilityError
-from whero.vatbrain.providers.volcengine.mapper import (
+from whero.aiflect.core.errors import UnsupportedCapabilityError
+from whero.aiflect.providers.volcengine.mapper import (
     from_volcengine_generation_response,
     to_volcengine_generation_params,
 )

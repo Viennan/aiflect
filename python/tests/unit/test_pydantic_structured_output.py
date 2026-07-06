@@ -3,8 +3,8 @@ from __future__ import annotations
 from pydantic import BaseModel
 import pytest
 
-from whero.vatbrain import GenerationResponse, MessageItem
-from whero.vatbrain.structured import (
+from whero.aiflect import GenerationResponse, MessageItem
+from whero.aiflect.structured import (
     ParsedGenerationResponse,
     StructuredOutputParseError,
     pydantic_output,

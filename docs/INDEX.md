@@ -1,7 +1,7 @@
-# vatbrain 知识库索引
+# aiflect 知识库索引
 
 状态：持续维护
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## Requirements
 
@@ -16,10 +16,11 @@
 - [REQ-2026-06-remote-context-cache-strategy.CN.md](requirements/REQ-2026-06-remote-context-cache-strategy.CN.md)：RemoteContextHint 与缓存策略升级记录，说明 `enable_cache/new_items_start_index`、response-style 自动 response id 管理、失效 refresh 和 Anthropic automatic cache 的新语义。
 - [REQ-2026-06-session-cache-strategy.CN.md](requirements/REQ-2026-06-session-cache-strategy.CN.md)：Session cache 策略需求记录，说明 `RemoteContextHint.session_key`、OpenAI `prompt_cache_key`、Volcengine Responses API Session 缓存与 1h 生命周期管理的实现状态。
 - [REQ-2026-06-python-deepseek-provider.CN.md](requirements/REQ-2026-06-python-deepseek-provider.CN.md)：Python DeepSeek provider 需求记录，说明 Anthropic 兼容接口、`api_format` 初始化参数、reasoning、工具、cache hint 兼容和 OpenAI completion 预留状态。
+- [REQ-2026-07-package-rename-aiflect.CN.md](requirements/REQ-2026-07-package-rename-aiflect.CN.md)：Package rename 需求记录，说明旧项目名迁移到 `aiflect` 后的公开包名、导入路径、目录、错误基类、环境变量前缀和文档同步范围。
 
 ## Design
 
-- [draft.CN.md](design/draft.CN.md)：项目冷启动草稿，记录 `vatbrain` 的初始目标和早期设计构想。
+- [draft.CN.md](design/draft.CN.md)：项目冷启动草稿，记录 `aiflect` 的初始目标和早期设计构想。
 - [high-level-design.CN.md](design/high-level-design.CN.md)：高层次设计方案，定义设计哲学、模块职责、核心抽象、capability 来源与可靠性、非目标、演进路线和 FAQ。
 - [provider-capability-integration.CN.md](design/provider-capability-integration.CN.md)：Provider 能力整合设计，基于火山方舟资料完善 provider-side state、文件资源、多模态 embedding、media generation 和异步任务等跨厂商抽象；provider-hosted/remote tools 暂缓进入通用 core。
 - [provider-native-replay.CN.md](design/provider-native-replay.CN.md)：Provider 原生重放设计，规划 provider item snapshot、显式 replay policy、强制 replay、remote context 覆盖范围、OpenAI 差分传输、OpenAI `phase` 语义评估与跨 provider replay 长期 TODO。
@@ -46,6 +47,7 @@
 - [v0.2-responses-contract-hardening.CN.md](impls/python/v0.2-responses-contract-hardening.CN.md)：Python v0.2 Responses Contract Hardening 设计方案，细化 OpenAI Responses API 参数映射、structured output、streaming event、stream accumulator、错误映射与验收测试。
 - [v0.3-core-api-family-expansion.CN.md](impls/python/v0.3-core-api-family-expansion.CN.md)：Python v0.3 Core API Family Expansion 实现基线，系统说明 items、generation、embedding、resources、media、function/custom tools、capabilities、OpenAI adapter、Pydantic helper 与 replay 的已实现边界。
 - [impls/python/pydantic-structured-output.CN.md](impls/python/pydantic-structured-output.CN.md)：Python Pydantic Structured Output 便捷层方案与实现记录，说明可选 Pydantic v2 helper、strict schema 生成、最终响应解析、client convenience 与测试策略。
+- [package-rename-aiflect.CN.md](impls/python/package-rename-aiflect.CN.md)：Python package rename 实现记录，说明源码目录、import 路径、distribution name、错误基类和环境变量前缀的重命名影响面。
 - [impls/python/STATUS.md](impls/python/STATUS.md)：Python 实现状态，记录当前基线、OpenAI/Volcengine/Anthropic/DeepSeek adapter 已实现范围、暂不实现项、后续阶段和验证方式。
 
 ## User Docs

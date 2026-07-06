@@ -5,9 +5,9 @@
 
 ## 概览
 
-本目录保存火山方舟相关开发资料的本地快照，用于分析 `vatbrain` 的跨厂商抽象边界。资料覆盖 Chat API、Responses API、Responses API 专题教程、上下文缓存、Files API、多模态 embedding、图片/视频理解、图片/视频生成、函数调用、结构化输出、reasoning 与 streaming。
+本目录保存火山方舟相关开发资料的本地快照，用于分析 `aiflect` 的跨厂商抽象边界。资料覆盖 Chat API、Responses API、Responses API 专题教程、上下文缓存、Files API、多模态 embedding、图片/视频理解、图片/视频生成、函数调用、结构化输出、reasoning 与 streaming。
 
-这些资料是第三方能力事实来源，不是 `vatbrain` 自身设计文档。面向产品设计的归纳请参见 [provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md)。
+这些资料是第三方能力事实来源，不是 `aiflect` 自身设计文档。面向产品设计的归纳请参见 [provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md)。
 
 ## 推理与对话
 
@@ -53,10 +53,10 @@
 - [video_gen_query_api_ref.md](video_gen_query_api_ref.md)：视频生成任务查询 API reference，说明状态、产物 URL、尾帧、seed、resolution、ratio、duration/frames、fps、音频、priority、usage 等返回字段。
 - [video_gen_cancel_api_ref.md](video_gen_cancel_api_ref.md)：视频生成任务取消/删除 API reference，说明 queued 任务取消与终态任务记录删除行为。
 
-## 对 vatbrain 的设计提示
+## 对 aiflect 的设计提示
 
-- 火山方舟的 Responses API 与 `vatbrain` 的 `Full-context First` 不冲突，但其默认存储、`previous_response_id` 和 `caching` 应被视为 provider-side optimization，而不是核心语义状态。
+- 火山方舟的 Responses API 与 `aiflect` 的 `Full-context First` 不冲突，但其默认存储、`previous_response_id` 和 `caching` 应被视为 provider-side optimization，而不是核心语义状态。
 - 火山方舟 Responses API Session 缓存依赖 `caching={"type":"enabled"}`、`store`、`previous_response_id` 和 `expire_at` 共同工作；其中 `expire_at` 同时影响 response 存储和 token cache 生命周期，适合由 adapter 封装为受控策略。
 - 火山方舟同时暴露用户执行的 function tools 与 provider-hosted tools，因此 `Tool` 抽象需要表达执行责任。
 - Files API 说明文件资源具有独立生命周期，不能只作为 message content 的一个字符串字段处理。
-- 多模态 embedding 和媒体生成说明 `vatbrain` 需要把 inference、representation、resource、media generation 分成不同 API 家族。
+- 多模态 embedding 和媒体生成说明 `aiflect` 需要把 inference、representation、resource、media generation 分成不同 API 家族。

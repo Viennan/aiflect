@@ -23,7 +23,7 @@ OpenAI 与 Volcengine mapper 根据 `new_items_start_index` 查找 anchor item s
 
 ## Core 改动
 
-在 [generation.py](../../../python/whero/vatbrain/core/generation.py) 中扩展：
+在 [generation.py](../../../python/whero/aiflect/core/generation.py) 中扩展：
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -42,7 +42,7 @@ class RemoteContextHint:
 
 导出：
 
-- `whero.vatbrain.core.__init__` 和 `whero.vatbrain.__init__` 无需新增导出名，因为字段属于既有 class。
+- `whero.aiflect.core.__init__` 和 `whero.aiflect.__init__` 无需新增导出名，因为字段属于既有 class。
 
 ## OpenAI Adapter
 

@@ -12,7 +12,7 @@ DeepSeek adapter 首期只实现 Anthropic-compatible Messages API。OpenAI comp
 ## 包结构
 
 ```text
-python/whero/vatbrain/providers/deepseek/
+python/whero/aiflect/providers/deepseek/
   __init__.py
   capabilities.py
   client.py

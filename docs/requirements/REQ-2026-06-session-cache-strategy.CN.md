@@ -6,9 +6,9 @@
 
 ## 背景
 
-本需求提出前，`vatbrain` 已经通过 `RemoteContextHint(enable_cache, new_items_start_index)` 建立了 provider-side cache 与 response-style 差分传输的通用入口。既有实现依赖各 provider 的默认缓存策略，OpenAI 与 Volcengine 可以通过 `previous_response_id` 减少传输，Anthropic 通过 automatic prompt caching 复用完整上下文前缀。
+本需求提出前，`aiflect` 已经通过 `RemoteContextHint(enable_cache, new_items_start_index)` 建立了 provider-side cache 与 response-style 差分传输的通用入口。既有实现依赖各 provider 的默认缓存策略，OpenAI 与 Volcengine 可以通过 `previous_response_id` 减少传输，Anthropic 通过 automatic prompt caching 复用完整上下文前缀。
 
-在多轮对话、工具调用、角色扮演和长上下文问答中，仅依赖默认缓存策略仍可能造成缓存命中率不稳定。OpenAI Responses API 提供 `prompt_cache_key`，Volcengine Responses API 提供显式 Session 缓存，Anthropic automatic cache 会随对话增长自动更新缓存点。需要在 `vatbrain` 中增加一个 provider-neutral 的 session 标识，让用户可以表达“这些请求属于同一个多轮会话缓存池”，并由各 provider adapter 映射到合适的原生参数组合。
+在多轮对话、工具调用、角色扮演和长上下文问答中，仅依赖默认缓存策略仍可能造成缓存命中率不稳定。OpenAI Responses API 提供 `prompt_cache_key`，Volcengine Responses API 提供显式 Session 缓存，Anthropic automatic cache 会随对话增长自动更新缓存点。需要在 `aiflect` 中增加一个 provider-neutral 的 session 标识，让用户可以表达“这些请求属于同一个多轮会话缓存池”，并由各 provider adapter 映射到合适的原生参数组合。
 
 Volcengine 还存在特殊生命周期约束：Responses API 的 `expire_at` 同时影响 response 存储和 token cache 存储，且是绝对过期时刻，不会随使用续期。因此 adapter 需要在 previous response 即将到期时主动退回 full-context 请求，而不是等 provider 报错。
 
@@ -32,7 +32,7 @@ Volcengine 还存在特殊生命周期约束：Responses API 的 `expire_at` 同
 
 ## 非范围
 
-- 不引入 `vatbrain` 自己的持久化 conversation/session runtime。
+- 不引入 `aiflect` 自己的持久化 conversation/session runtime。
 - 不让用户直接传入 provider response id、context id 或 `expire_at`。
 - 不实现 Volcengine Context API；本需求仅覆盖 Responses API Session 缓存。
 - 不暴露 OpenAI `prompt_cache_retention` 为通用 core 字段；可继续通过 provider-specific 机制后续讨论。

@@ -1,7 +1,7 @@
 # 需求状态总览
 
 状态：持续维护
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## 定位
 
@@ -30,6 +30,7 @@
 
 | Requirement | Status | Progress | Requirement Doc | Key Docs | Updated |
 | --- | --- | --- | --- | --- | --- |
+| Package rename to aiflect | `Completed` | Python 包目录、import 路径、distribution name、错误基类、环境变量前缀、测试、脚本、AGENTS/TEST 与知识库文档已统一为 `aiflect` | [REQ-2026-07-package-rename-aiflect.CN.md](REQ-2026-07-package-rename-aiflect.CN.md) | [package-rename-aiflect.CN.md](../impls/python/package-rename-aiflect.CN.md), [quickstart.CN.md](../user/python/quickstart.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-07-06 |
 | Session cache strategy | `Completed` | `RemoteContextHint.session_key` 已落地；OpenAI 映射为 `prompt_cache_key`，Volcengine 映射为 adapter-managed Responses API Session cache、1h `expire_at` 和过期前 full refresh；Anthropic/DeepSeek 兼容接收但不下发 | [REQ-2026-06-session-cache-strategy.CN.md](REQ-2026-06-session-cache-strategy.CN.md) | [session-cache-strategy.CN.md](../design/session-cache-strategy.CN.md), [session-cache-strategy.CN.md](../impls/python/session-cache-strategy.CN.md), [quickstart.CN.md](../user/python/quickstart.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-06-12 |
 | Python Anthropic reasoning | `Completed` | `ReasoningConfig` 已映射为 Anthropic `thinking` / `output_config.effort`，structured output effort 合并、capability、测试与文档已完成 | [REQ-2026-06-python-anthropic-reasoning.CN.md](REQ-2026-06-python-anthropic-reasoning.CN.md) | [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md), [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md), [anthropic-quickstart.CN.md](../user/python/anthropic-quickstart.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-06-07 |
 | Python DeepSeek provider | `Completed` | Anthropic 兼容 Messages API、`api_format` 初始化参数、text generation/streaming、function tools、reasoning、cache hint 兼容、capability、测试与文档已完成 | [REQ-2026-06-python-deepseek-provider.CN.md](REQ-2026-06-python-deepseek-provider.CN.md) | [deepseek-provider-support.CN.md](../design/deepseek-provider-support.CN.md), [deepseek-adapter.CN.md](../impls/python/deepseek-adapter.CN.md), [deepseek-quickstart.CN.md](../user/python/deepseek-quickstart.CN.md), [api-reference.CN.md](../user/python/api-reference.CN.md) | 2026-06-07 |

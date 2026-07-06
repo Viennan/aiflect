@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from whero.vatbrain import CapabilitySource
-from whero.vatbrain.core.capabilities import CapabilityValue, GenerationCapability
-from whero.vatbrain.providers.anthropic import AnthropicClient
-from whero.vatbrain.providers.deepseek import DeepSeekClient
-from whero.vatbrain.providers.openai import OpenAIClient
-from whero.vatbrain.providers.volcengine import VolcengineClient
+from whero.aiflect import CapabilitySource
+from whero.aiflect.core.capabilities import CapabilityValue, GenerationCapability
+from whero.aiflect.providers.anthropic import AnthropicClient
+from whero.aiflect.providers.deepseek import DeepSeekClient
+from whero.aiflect.providers.openai import OpenAIClient
+from whero.aiflect.providers.volcengine import VolcengineClient
 
 
 def test_openai_adapter_capability_is_provider_level() -> None:

@@ -6,14 +6,14 @@
 
 ## 定位
 
-当前 structured output 使用 `ResponseFormat` 传入 JSON Schema。Pydantic 便捷层提供 Python 侧的 schema 定义与解析 helper，但不会改变 `vatbrain` 的 JSON Schema-only 原则，也不会兼容 JSON mode / `json_object`。
+当前 structured output 使用 `ResponseFormat` 传入 JSON Schema。Pydantic 便捷层提供 Python 侧的 schema 定义与解析 helper，但不会改变 `aiflect` 的 JSON Schema-only 原则，也不会兼容 JSON mode / `json_object`。
 
 ## 安装
 
 通过 optional extra 安装：
 
 ```bash
-pip install "whero-vatbrain[pydantic]"
+pip install "whero-aiflect[pydantic]"
 ```
 
 仓库开发环境中对应：
@@ -28,9 +28,9 @@ cd python
 ```python
 from pydantic import BaseModel
 
-from whero.vatbrain import MessageItem
-from whero.vatbrain.providers.openai import OpenAIClient
-from whero.vatbrain.structured import pydantic_output
+from whero.aiflect import MessageItem
+from whero.aiflect.providers.openai import OpenAIClient
+from whero.aiflect.structured import pydantic_output
 
 
 class Contact(BaseModel):
@@ -142,7 +142,7 @@ class Contact(BaseModel):
 解析错误类型是 `StructuredOutputParseError`：
 
 ```python
-from whero.vatbrain.structured import StructuredOutputParseError
+from whero.aiflect.structured import StructuredOutputParseError
 
 try:
     parsed = contact_output.parse_response(response)
@@ -163,7 +163,7 @@ except StructuredOutputParseError as exc:
 当前不做 partial JSON 流式解析。需要流式展示时，可以照常消费 stream event，并在 accumulator 得到最终 response 后解析：
 
 ```python
-from whero.vatbrain import GenerationStreamAccumulator
+from whero.aiflect import GenerationStreamAccumulator
 
 accumulator = GenerationStreamAccumulator(provider="openai")
 
@@ -180,7 +180,7 @@ parsed = contact_output.parse_response(response)
 
 ## 与 OpenAI SDK 的关系
 
-OpenAI Python SDK 支持把 Pydantic model 传给 `client.responses.parse(..., text_format=Model)` 并读取 `response.output_parsed`。`vatbrain` 参考这种体验，但实现上仍调用 `client.generate()` 并使用 `ResponseFormat`，不会绕过 vatbrain adapter。
+OpenAI Python SDK 支持把 Pydantic model 传给 `client.responses.parse(..., text_format=Model)` 并读取 `response.output_parsed`。`aiflect` 参考这种体验，但实现上仍调用 `client.generate()` 并使用 `ResponseFormat`，不会绕过 aiflect adapter。
 
 这样做可以保留 provider-neutral mapping、provider-native replay、remote context fallback 和统一错误模型。
 

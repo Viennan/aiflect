@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from whero.vatbrain import EmbeddingInput, ImagePart, TextPart
+from whero.aiflect import EmbeddingInput, ImagePart, TextPart
 
 
 pytestmark = pytest.mark.costly
@@ -19,7 +19,7 @@ def test_costly_text_embedding_dense_vector(costly_client: Any, costly_model_cas
 
     response = costly_client.embed(
         model=costly_model_case.model_id,
-        inputs=["VATBRAIN costly text embedding smoke test."],
+        inputs=["AIFLECT costly text embedding smoke test."],
     )
 
     _assert_embedding_response(response, costly_model_case)
@@ -37,7 +37,7 @@ def test_costly_text_embedding_structured_input(costly_client: Any, costly_model
         "inputs": [
             EmbeddingInput(
                 [
-                    TextPart("VATBRAIN costly embedding structured input."),
+                    TextPart("AIFLECT costly embedding structured input."),
                     TextPart("Return a dense float embedding."),
                 ]
             )

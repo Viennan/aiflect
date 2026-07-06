@@ -6,9 +6,9 @@
 
 ## 读者路径
 
-本文用由简入繁的方式介绍 Python 版 `vatbrain` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围见 [api-reference.CN.md](api-reference.CN.md)。Volcengine provider 细节见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)。Anthropic provider 细节见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)。DeepSeek provider 细节见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
+本文用由简入繁的方式介绍 Python 版 `aiflect` 的常用编程模型。完整 API 字段、枚举和当前 OpenAI / Volcengine / Anthropic / DeepSeek adapter 支持范围见 [api-reference.CN.md](api-reference.CN.md)。Volcengine provider 细节见 [volcengine-quickstart.CN.md](volcengine-quickstart.CN.md)。Anthropic provider 细节见 [anthropic-quickstart.CN.md](anthropic-quickstart.CN.md)。DeepSeek provider 细节见 [deepseek-quickstart.CN.md](deepseek-quickstart.CN.md)。Pydantic structured output 的细节见 [user/python/pydantic-structured-output.CN.md](pydantic-structured-output.CN.md)。
 
-`vatbrain` 是 provider-neutral 的推理调用抽象层，不是 agent runtime。它不会自动选择 provider、自动选择 model、自动 fallback、自动执行工具或自动维护远端会话。用户代码始终掌控 provider、model、上下文、工具执行和下一轮调用。
+`aiflect` 是 provider-neutral 的推理调用抽象层，不是 agent runtime。它不会自动选择 provider、自动选择 model、自动 fallback、自动执行工具或自动维护远端会话。用户代码始终掌控 provider、model、上下文、工具执行和下一轮调用。
 
 ## 安装与环境
 
@@ -32,10 +32,10 @@ OpenAI adapter 初始化时必须显式传入 `api_key`，或通过 `ClientConfi
 初始化 client：
 
 ```python
-from whero.vatbrain.providers.openai import OpenAIClient
-from whero.vatbrain.providers.volcengine import VolcengineClient
-from whero.vatbrain.providers.anthropic import AnthropicClient
-from whero.vatbrain.providers.deepseek import DeepSeekClient
+from whero.aiflect.providers.openai import OpenAIClient
+from whero.aiflect.providers.volcengine import VolcengineClient
+from whero.aiflect.providers.anthropic import AnthropicClient
+from whero.aiflect.providers.deepseek import DeepSeekClient
 
 openai_client = OpenAIClient(api_key="...")
 volcengine_client = VolcengineClient(api_key="...")
@@ -59,8 +59,8 @@ client = OpenAIClient(
 ## 最小生成
 
 ```python
-from whero.vatbrain import MessageItem
-from whero.vatbrain.providers.openai import OpenAIClient
+from whero.aiflect import MessageItem
+from whero.aiflect.providers.openai import OpenAIClient
 
 client = OpenAIClient(api_key="...")
 
@@ -90,11 +90,11 @@ response = await client.agenerate(
 ## 常用生成配置
 
 ```python
-from whero.vatbrain import GenerationConfig, MessageItem, ReasoningConfig, ToolCallConfig
+from whero.aiflect import GenerationConfig, MessageItem, ReasoningConfig, ToolCallConfig
 
 response = client.generate(
     model="gpt-5.1",
-    items=[MessageItem.user("Explain vatbrain in one paragraph.")],
+    items=[MessageItem.user("Explain aiflect in one paragraph.")],
     generation_config=GenerationConfig(
         temperature=0.2,
         max_output_tokens=300,
@@ -122,10 +122,10 @@ response = client.generate(
 
 ## Remote Context 与 Replay
 
-`RemoteContextHint` 用于表达 provider-side cache 和新增边界 hint。它是优化提示，不是 vatbrain 的会话状态模型。
+`RemoteContextHint` 用于表达 provider-side cache 和新增边界 hint。它是优化提示，不是 aiflect 的会话状态模型。
 
 ```python
-from whero.vatbrain import MessageItem, RemoteContextHint
+from whero.aiflect import MessageItem, RemoteContextHint
 
 first_items = [MessageItem.user("Summarize the contract.")]
 
@@ -163,7 +163,7 @@ response = client.generate(
 Provider 返回的 output item 会在 `provider_snapshots` 字段保留原始 payload。OpenAI adapter 默认优先使用 snapshot 做同 provider 高保真重放，以保留 OpenAI `phase` 等原生字段。手工构造 assistant 历史消息时可使用通用 `AssistantMessagePhase`：
 
 ```python
-from whero.vatbrain import AssistantMessagePhase, MessageItem
+from whero.aiflect import AssistantMessagePhase, MessageItem
 
 history = [
     MessageItem.assistant(
@@ -177,7 +177,7 @@ history = [
 如需控制 replay 策略：
 
 ```python
-from whero.vatbrain import ReplayPolicy
+from whero.aiflect import ReplayPolicy
 
 response = client.generate(
     model="gpt-5.1",
@@ -193,7 +193,7 @@ response = client.generate(
 ## 流式生成
 
 ```python
-from whero.vatbrain import MessageItem
+from whero.aiflect import MessageItem
 
 for event in client.stream_generate(
     model="gpt-5.1",
@@ -218,7 +218,7 @@ async for event in client.astream_generate(
 从流式事件重建 `GenerationResponse`：
 
 ```python
-from whero.vatbrain import GenerationStreamAccumulator, MessageItem
+from whero.aiflect import GenerationStreamAccumulator, MessageItem
 
 accumulator = GenerationStreamAccumulator(provider="openai")
 
@@ -252,7 +252,7 @@ for artifact in response.artifacts:
 参考图生成仍使用同一个 `generate_image()` 入口。OpenAI adapter 会根据 `input_items` 中是否存在参考图自动选择 `images.generate` 或 `images.edit`；Volcengine adapter 统一映射到 Ark `images.generate`。
 
 ```python
-from whero.vatbrain import ImagePart, MessageItem
+from whero.aiflect import ImagePart, MessageItem
 
 response = client.generate_image(
     model="gpt-image-1",
@@ -288,7 +288,7 @@ for event in client.stream_generate_image(
 Volcengine adapter 额外支持 Ark Content Generation 视频任务：
 
 ```python
-from whero.vatbrain import ImagePart, MessageItem, VideoPart
+from whero.aiflect import ImagePart, MessageItem, VideoPart
 
 task = volcengine_client.create_video_generation_task(
     model="doubao-seedance-2-0-260128",
@@ -315,10 +315,10 @@ print(task.status, task.artifacts)
 
 ## Structured Output
 
-`vatbrain` 只支持 JSON Schema structured output，不兼容 JSON mode / `json_object`。
+`aiflect` 只支持 JSON Schema structured output，不兼容 JSON mode / `json_object`。
 
 ```python
-from whero.vatbrain import MessageItem, ResponseFormat
+from whero.aiflect import MessageItem, ResponseFormat
 
 response = client.generate(
     model="gpt-5.1",
@@ -344,8 +344,8 @@ Python 侧可用 Pydantic v2 生成 schema 并解析最终响应：
 ```python
 from pydantic import BaseModel
 
-from whero.vatbrain import MessageItem
-from whero.vatbrain.structured import pydantic_output
+from whero.aiflect import MessageItem
+from whero.aiflect.structured import pydantic_output
 
 
 class Contact(BaseModel):
@@ -382,7 +382,7 @@ Anthropic adapter 会把 `ResponseFormat` 映射为 Messages API `output_config.
 
 ## 工具调用
 
-`vatbrain` 只定义工具协议，不执行工具。用户代码需要：
+`aiflect` 只定义工具协议，不执行工具。用户代码需要：
 
 1. 声明工具。
 2. 读取 `FunctionCallItem`。
@@ -397,7 +397,7 @@ Anthropic adapter 会把 `ResponseFormat` 映射为 Messages API `output_config.
 ```python
 import json
 
-from whero.vatbrain import FunctionCallItem, FunctionResultItem, MessageItem, ToolSpec
+from whero.aiflect import FunctionCallItem, FunctionResultItem, MessageItem, ToolSpec
 
 
 def get_weather(*, city: str) -> dict[str, object]:
@@ -456,7 +456,7 @@ followup = client.generate(
 如果工具需要直接接收自然语言、代码或其他任意字符串输入，可以使用 custom tool。OpenAI adapter 会把 `ToolSpec(type="custom")` 映射为 OpenAI custom tool；custom tool 不使用 `parameters_schema`，模型输出保存在 `FunctionCallItem.input`：
 
 ```python
-from whero.vatbrain import FunctionCallItem, FunctionResultItem, MessageItem, ToolSpec
+from whero.aiflect import FunctionCallItem, FunctionResultItem, MessageItem, ToolSpec
 
 
 def run_code(source: str) -> str:
@@ -529,7 +529,7 @@ embedding = await client.aembed(
 当前 OpenAI adapter 只支持 text embedding。Volcengine adapter 支持单样本多模态 embedding、instructions、dense vector；稀疏向量只支持纯文本输入：
 
 ```python
-from whero.vatbrain import EmbeddingInput, ImagePart
+from whero.aiflect import EmbeddingInput, ImagePart
 
 sample = EmbeddingInput(
     [ImagePart(url="https://example.test/image.png")],
@@ -544,7 +544,7 @@ sample = EmbeddingInput(
 当前 core 包含音频、视频、文件、reasoning、resource/file 和 media artifact/task 模型。这些模型用于稳定跨 provider 语义，不代表每个 adapter 都已全部支持。
 
 ```python
-from whero.vatbrain import FilePart, MessageItem, VideoPart
+from whero.aiflect import FilePart, MessageItem, VideoPart
 
 items = [
     MessageItem.user(
@@ -606,7 +606,7 @@ client = OpenAIClient(
 Provider 请求失败会抛出 `ProviderRequestError`，其中 `details` 保存 provider、operation、status code、request id、错误 code/param 与 raw body：
 
 ```python
-from whero.vatbrain.core.errors import ProviderRequestError
+from whero.aiflect.core.errors import ProviderRequestError
 
 try:
     response = client.generate(
@@ -624,7 +624,7 @@ except ProviderRequestError as exc:
 
 - `InvalidItemError`：item 或 remote context 覆盖范围不合法。
 - `UnsupportedCapabilityError`：请求了 adapter 明确不支持的能力。
-- `ProviderResponseMappingError`：provider 响应无法映射为 vatbrain 模型。
+- `ProviderResponseMappingError`：provider 响应无法映射为 aiflect 模型。
 - `StructuredOutputParseError`：structured output 解析失败。
 
 ## 当前限制

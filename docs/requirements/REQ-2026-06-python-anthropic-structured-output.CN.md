@@ -6,7 +6,7 @@
 
 ## 背景
 
-Python Anthropic adapter 已完成 Messages API generation、streaming、图片理解、user-executed function tools 和 automatic prefix caching，但 `ResponseFormat` 在首版实现中暂不支持。Anthropic Messages API 当前支持 structured outputs，主路径是 `output_config.format` 的 JSON Schema 形态；Python SDK 的 `messages.parse()` 是便捷层，不应绕过 `vatbrain` 自身的 request mapping、response mapping、snapshot 和 Pydantic helper。
+Python Anthropic adapter 已完成 Messages API generation、streaming、图片理解、user-executed function tools 和 automatic prefix caching，但 `ResponseFormat` 在首版实现中暂不支持。Anthropic Messages API 当前支持 structured outputs，主路径是 `output_config.format` 的 JSON Schema 形态；Python SDK 的 `messages.parse()` 是便捷层，不应绕过 `aiflect` 自身的 request mapping、response mapping、snapshot 和 Pydantic helper。
 
 本需求记录为 Anthropic provider 引入 `ResponseFormat` structured output 的范围和完成状态。详细设计见 [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md)，Python 实现记录见 [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md)。
 
@@ -29,7 +29,7 @@ ResponseFormat.json_schema
 output_config.format.type = "json_schema"
 ```
 
-- 保留 `json_schema_name`、`json_schema_description` 与 `json_schema_strict` 的 vatbrain 侧语义，不把它们映射到 Anthropic payload 中未明确支持的字段。
+- 保留 `json_schema_name`、`json_schema_description` 与 `json_schema_strict` 的 aiflect 侧语义，不把它们映射到 Anthropic payload 中未明确支持的字段。
 - 拒绝用户通过 `provider_options["output_config"]` 或 `provider_options["output_format"]` 绕过 adapter-owned structured output 映射。
 - structured output 与 assistant message prefill 同用时提前抛出 `UnsupportedCapabilityError`。
 - 支持 sync/async parsed helper。

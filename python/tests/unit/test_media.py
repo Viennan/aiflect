@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     ImageGenerationRequest,
     ImageGenerationResponse,
     MediaArtifact,
@@ -11,7 +11,7 @@ from whero.vatbrain import (
     TaskStatus,
     VideoGenerationRequest,
 )
-from whero.vatbrain.core.tools import ToolSpec
+from whero.aiflect.core.tools import ToolSpec
 
 
 def test_media_artifact_requires_a_reference() -> None:

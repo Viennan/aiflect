@@ -6,7 +6,7 @@
 
 ## 定位
 
-本文说明 Python 版 `vatbrain` 的 DeepSeek provider 用法。完整 API 字段见 [api-reference.CN.md](api-reference.CN.md)，实现边界见 [deepseek-adapter.CN.md](../../impls/python/deepseek-adapter.CN.md)。
+本文说明 Python 版 `aiflect` 的 DeepSeek provider 用法。完整 API 字段见 [api-reference.CN.md](api-reference.CN.md)，实现边界见 [deepseek-adapter.CN.md](../../impls/python/deepseek-adapter.CN.md)。
 
 DeepSeek adapter 当前使用 DeepSeek Anthropic-compatible Messages API。它支持文本生成、同步/异步、streaming、user-executed function tools、reasoning config 和 usage 映射；不支持图片/文件/音频/视频输入、structured output、Files API、embedding、media generation 或 explicit cache control。
 
@@ -20,7 +20,7 @@ cd python
 初始化 client：
 
 ```python
-from whero.vatbrain.providers.deepseek import DeepSeekClient
+from whero.aiflect.providers.deepseek import DeepSeekClient
 
 client = DeepSeekClient(api_key="...")
 ```
@@ -57,11 +57,11 @@ client = DeepSeekClient(
 
 ## 文本生成
 
-DeepSeek Anthropic-compatible Messages API 要求 `max_tokens`。使用 `vatbrain` 时应通过 `GenerationConfig.max_output_tokens` 提供：
+DeepSeek Anthropic-compatible Messages API 要求 `max_tokens`。使用 `aiflect` 时应通过 `GenerationConfig.max_output_tokens` 提供：
 
 ```python
-from whero.vatbrain import GenerationConfig, MessageItem
-from whero.vatbrain.providers.deepseek import DeepSeekClient
+from whero.aiflect import GenerationConfig, MessageItem
+from whero.aiflect.providers.deepseek import DeepSeekClient
 
 client = DeepSeekClient(api_key="...")
 
@@ -99,7 +99,7 @@ for event in client.stream_generate(
 DeepSeek reasoning 可通过 `ReasoningConfig` 控制：
 
 ```python
-from whero.vatbrain import GenerationConfig, MessageItem, ReasoningConfig
+from whero.aiflect import GenerationConfig, MessageItem, ReasoningConfig
 
 response = client.generate(
     model="deepseek-reasoner",
@@ -125,7 +125,7 @@ response = client.generate(
 DeepSeek adapter 只支持 user-executed function tools，不自动执行工具：
 
 ```python
-from whero.vatbrain import GenerationConfig, MessageItem, ToolChoice, ToolCallConfig, ToolSpec
+from whero.aiflect import GenerationConfig, MessageItem, ToolChoice, ToolCallConfig, ToolSpec
 
 tool = ToolSpec(
     name="lookup",
@@ -139,7 +139,7 @@ tool = ToolSpec(
 
 response = client.generate(
     model="deepseek-chat",
-    items=[MessageItem.user("Look up vatbrain.")],
+    items=[MessageItem.user("Look up aiflect.")],
     tools=[tool],
     tool_call_config=ToolCallConfig(tool_choice=ToolChoice.AUTO),
     generation_config=GenerationConfig(max_output_tokens=256),
@@ -155,7 +155,7 @@ response = client.generate(
 DeepSeek 会忽略 Anthropic `cache_control`。因此 DeepSeek adapter 接收 `RemoteContextHint` 只是为了兼容通用调用形状；`session_key` 也会被兼容接收但不下发。adapter 不会下发 cache control，也不会做 response id 差分传输：
 
 ```python
-from whero.vatbrain import RemoteContextHint
+from whero.aiflect import RemoteContextHint
 
 response = client.generate(
     model="deepseek-chat",

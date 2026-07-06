@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This project named `vatbrain` defines a general-purpose LLM inference invocation abstraction layer and related adapters, which are used to hide the interface differences of various providers (OpenAI, Anthropic, and others).
+This project named `aiflect` defines a general-purpose LLM inference invocation abstraction layer and related adapters, which are used to hide the interface differences of various providers (OpenAI, Anthropic, and others).
 
 ## Core Project Directories
 
@@ -14,7 +14,7 @@ This project named `vatbrain` defines a general-purpose LLM inference invocation
 - `TEST.md` - Guidelines for building unittests.
 - `python` - Source directory for python implementation version.
   - `whero` - The top domain for this python package. There are other sub-domain packages in their own repositories, which have the same top domain `whero`.
-    - `vatbrain` - Implementation directory for `vatbrain` subdomain.
+    - `aiflect` - Implementation directory for `aiflect` subdomain.
   - `tests` - All unittests.
   - `pyproject.toml` - For python packaging.
 

@@ -7,7 +7,7 @@
 
 ## 定位
 
-v0.4 已实现 `vatbrain` Python 参考实现的第二个 provider adapter：Volcengine / 火山方舟。该阶段没有继续扩张 core 抽象，而是用火山方舟的 Responses API、Files API 与多模态 embedding 验证 v0.3 core 是否能够承载跨厂商差异。
+v0.4 已实现 `aiflect` Python 参考实现的第二个 provider adapter：Volcengine / 火山方舟。该阶段没有继续扩张 core 抽象，而是用火山方舟的 Responses API、Files API 与多模态 embedding 验证 v0.3 core 是否能够承载跨厂商差异。
 
 本方案是 [REQ-2026-05-python-reference-implementation-roadmap.CN.md](../../requirements/REQ-2026-05-python-reference-implementation-roadmap.CN.md) 中 v0.4 的详细实施设计。高层语义以 [high-level-design.CN.md](../../design/high-level-design.CN.md)、[provider-capability-integration.CN.md](../../design/provider-capability-integration.CN.md) 与 [provider-native-replay.CN.md](../../design/provider-native-replay.CN.md) 为准；当前 core/API family 基线见 [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)。
 
@@ -91,7 +91,7 @@ default base URL: https://ark.cn-beijing.volces.com/api/v3
 新增目录：
 
 ```text
-python/whero/vatbrain/providers/volcengine/
+python/whero/aiflect/providers/volcengine/
   __init__.py
   capabilities.py
   client.py
@@ -142,7 +142,7 @@ v0.4 不新增 OpenAI-compatible SDK 依赖，也不新增 direct HTTP 专用依
 `VolcengineClient` 与 `OpenAIClient` 保持同构风格：
 
 ```python
-from whero.vatbrain.providers.volcengine import VolcengineClient
+from whero.aiflect.providers.volcengine import VolcengineClient
 
 client = VolcengineClient(api_key="...")
 
@@ -183,7 +183,7 @@ VolcengineClient(
 - `api_key` 优先级：显式参数 > `ClientConfig.api_key`；不再读取环境变量作为隐式 fallback。
 - `base_url` 优先级：显式参数 > `ClientConfig.base_url` > 默认 base URL。
 - `timeout`、`max_retries` 与 `provider_client_options` 透传给 Ark SDK backend；LLM 凭据统一使用 `api_key` / `ClientConfig.api_key`，在 adapter 内部以 `SecretString` 保存，创建 Ark SDK client 时才解包。
-- 不读取 `ARK_API_KEY` 或 `ENV_VATBRAIN_VOLCENGINE_API_KEY` 作为 public contract；需要兼容时由用户代码显式读取后传入。
+- 不读取 `ARK_API_KEY` 或 `ENV_AIFLECT_VOLCENGINE_API_KEY` 作为 public contract；需要兼容时由用户代码显式读取后传入。
 
 ## Generation 映射
 
@@ -441,7 +441,7 @@ provider_options -> top-level native params
 Purpose：
 
 - 火山方舟多模态理解资料使用 `purpose="user_data"`。
-- 该字段在 Volcengine 文档中主要用于 Files API 的 provider-side 过滤/分类，当前缺少跨 provider 语义，不能证明为 vatbrain core 的稳定文件资源字段。
+- 该字段在 Volcengine 文档中主要用于 Files API 的 provider-side 过滤/分类，当前缺少跨 provider 语义，不能证明为 aiflect core 的稳定文件资源字段。
 - v0.4 删除 core `FilePurpose`，也不在 `FileUploadRequest` / `FileResource` 上保留 normalized purpose。
 - Volcengine adapter 可在 `upload_file(..., purpose="user_data")`、`list_files(purpose="user_data")` 或 `provider_options["purpose"]` 中接受原生字符串；未指定时 upload 默认 `user_data`。
 - 返回对象仅在 `FileResource.metadata["raw_purpose"]` 保存 provider 原始值。
@@ -690,8 +690,8 @@ Volcengine adapter 应与 OpenAI adapter 保持一致：
 真实 API 测试默认关闭：
 
 ```text
-ENV_VATBRAIN_RUN_INTEGRATION_TESTS=1
-ENV_VATBRAIN_VOLCENGINE_API_KEY=...
+ENV_AIFLECT_RUN_INTEGRATION_TESTS=1
+ENV_AIFLECT_VOLCENGINE_API_KEY=...
 ```
 
 建议 integration tests 分组：

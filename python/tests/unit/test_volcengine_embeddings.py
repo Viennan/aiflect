@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import EmbeddingInput, EmbeddingRequest, ImagePart, TextPart, VideoPart
-from whero.vatbrain.core.errors import InvalidItemError, UnsupportedCapabilityError
-from whero.vatbrain.providers.volcengine.embeddings import (
+from whero.aiflect import EmbeddingInput, EmbeddingRequest, ImagePart, TextPart, VideoPart
+from whero.aiflect.core.errors import InvalidItemError, UnsupportedCapabilityError
+from whero.aiflect.providers.volcengine.embeddings import (
     from_volcengine_embedding_response,
     to_volcengine_embedding_params,
 )

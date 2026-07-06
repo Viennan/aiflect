@@ -75,7 +75,7 @@ def main() -> int:
     command = _pytest_command(args, config_path)
     sys.stdout.flush()
     env = dict(os.environ)
-    env["VATBRAIN_COSTLY_RUNNER"] = "1"
+    env["AIFLECT_COSTLY_RUNNER"] = "1"
     return subprocess.run(command, cwd=REPO_ROOT / "python", env=env, check=False).returncode
 
 

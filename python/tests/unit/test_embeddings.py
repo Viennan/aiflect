@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from whero.vatbrain import EmbeddingInput, EmbeddingRequest, EmbeddingVector, ImagePart, SparseEmbedding
+from whero.aiflect import EmbeddingInput, EmbeddingRequest, EmbeddingVector, ImagePart, SparseEmbedding
 
 
 def test_embedding_input_accepts_modality() -> None:

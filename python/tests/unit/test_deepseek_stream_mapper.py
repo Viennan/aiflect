@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from whero.vatbrain import GenerationStreamAccumulator, MessageItem, TextPart
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.core.items import FunctionCallItem
-from whero.vatbrain.providers.deepseek.stream import from_deepseek_stream_event
+from whero.aiflect import GenerationStreamAccumulator, MessageItem, TextPart
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.core.items import FunctionCallItem
+from whero.aiflect.providers.deepseek.stream import from_deepseek_stream_event
 
 
 def test_deepseek_text_delta_maps_to_normalized_event() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     AssistantMessagePhase,
     AudioPart,
     FilePart,

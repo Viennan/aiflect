@@ -6,7 +6,7 @@
 
 ## 背景
 
-`vatbrain` core 已将 `ResponseFormat` 收敛为 JSON Schema structured output 模型，但 Python 用户仍需要手写 JSON Schema 和手动解析 JSON。
+`aiflect` core 已将 `ResponseFormat` 收敛为 JSON Schema structured output 模型，但 Python 用户仍需要手写 JSON Schema 和手动解析 JSON。
 
 ## 目标
 

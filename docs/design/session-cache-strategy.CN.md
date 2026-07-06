@@ -7,7 +7,7 @@
 
 ## 背景
 
-`vatbrain` 已经把 provider-side state/cache 归入 `RemoteContextHint`。现有模型要求用户传入完整 `GenerationRequest.items`，同时允许 OpenAI 与 Volcengine 这类 response-style provider 在新增边界明确时使用 `previous_response_id` 和 suffix input 做传输优化；Anthropic 则在完整 Messages API 输入上启用 automatic prompt caching。
+`aiflect` 已经把 provider-side state/cache 归入 `RemoteContextHint`。现有模型要求用户传入完整 `GenerationRequest.items`，同时允许 OpenAI 与 Volcengine 这类 response-style provider 在新增边界明确时使用 `previous_response_id` 和 suffix input 做传输优化；Anthropic 则在完整 Messages API 输入上启用 automatic prompt caching。
 
 多轮对话的缓存命中率还可以进一步提高。OpenAI 提供 `prompt_cache_key` 改善同类请求的 cache pool 命中；Volcengine Responses API 提供显式 Session 缓存；Anthropic automatic cache 会随多轮上下文增长动态维护缓存点。这些能力都指向同一个用户意图：一组请求属于同一个多轮 session，希望 provider 尽可能复用历史上下文计算。
 
@@ -15,7 +15,7 @@
 
 ### Full-context First
 
-`GenerationRequest.items` 仍是每次 generation 的完整语义事实来源。`session_key` 不代表 `vatbrain` 持有的 conversation，也不允许 adapter 只凭 session key 省略用户没有传入的历史语义上下文。
+`GenerationRequest.items` 仍是每次 generation 的完整语义事实来源。`session_key` 不代表 `aiflect` 持有的 conversation，也不允许 adapter 只凭 session key 省略用户没有传入的历史语义上下文。
 
 即使 provider-side session/cache 已过期、被删除或命中失败，adapter 也必须能够基于完整 `items` 发起语义等价请求。
 
@@ -165,7 +165,7 @@ metadata 不应包含原始 `session_key`。如需要诊断，可记录稳定 ha
 
 ### 为什么不引入 `Session` 对象？
 
-当前问题是 provider-side cache 命中优化，不是 `vatbrain` 自身会话状态管理。引入 `Session` 对象会模糊 Full-context First，并暗示 `vatbrain` 可以代表用户维护完整对话状态。首期只增加 `session_key`，保持模型小而清晰。
+当前问题是 provider-side cache 命中优化，不是 `aiflect` 自身会话状态管理。引入 `Session` 对象会模糊 Full-context First，并暗示 `aiflect` 可以代表用户维护完整对话状态。首期只增加 `session_key`，保持模型小而清晰。
 
 ### 为什么 Volcengine 不暴露 `expire_at`？
 
