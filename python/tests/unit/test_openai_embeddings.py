@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import EmbeddingInput, EmbeddingRequest, ImagePart, TextPart
-from whero.vatbrain.core.errors import InvalidItemError, UnsupportedCapabilityError
-from whero.vatbrain.providers.openai.mapper import (
+from whero.aiflect import EmbeddingInput, EmbeddingRequest, ImagePart, TextPart
+from whero.aiflect.core.errors import InvalidItemError, UnsupportedCapabilityError
+from whero.aiflect.providers.openai.mapper import (
     from_openai_embedding_response,
     to_openai_embedding_params,
 )

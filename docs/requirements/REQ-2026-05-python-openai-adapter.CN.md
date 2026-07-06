@@ -6,7 +6,7 @@
 
 ## 背景
 
-Python 是 `vatbrain` 的参考实现语言，第一阶段需要选择一个真实 provider adapter 验证 core 抽象能否落地到厂商 API。OpenAI adapter 被选为首个 provider adapter。
+Python 是 `aiflect` 的参考实现语言，第一阶段需要选择一个真实 provider adapter 验证 core 抽象能否落地到厂商 API。OpenAI adapter 被选为首个 provider adapter。
 
 ## 目标
 

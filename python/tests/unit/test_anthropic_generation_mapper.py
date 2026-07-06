@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     FunctionCallItem,
     FunctionResultItem,
     FunctionToolType,
@@ -21,9 +21,9 @@ from whero.vatbrain import (
     ToolSpec,
     VideoPart,
 )
-from whero.vatbrain.core.errors import InvalidItemError, UnsupportedCapabilityError
-from whero.vatbrain.core.items import ReasoningItem
-from whero.vatbrain.providers.anthropic.mapper import (
+from whero.aiflect.core.errors import InvalidItemError, UnsupportedCapabilityError
+from whero.aiflect.core.items import ReasoningItem
+from whero.aiflect.providers.anthropic.mapper import (
     from_anthropic_generation_response,
     to_anthropic_generation_params,
 )
@@ -124,7 +124,7 @@ def test_generation_mapper_replays_tool_use_and_tool_result_as_messages() -> Non
             MessageItem.user("need data"),
             FunctionCallItem(
                 name="lookup",
-                arguments='{"query":"vatbrain"}',
+                arguments='{"query":"aiflect"}',
                 call_id="toolu_1",
             ),
             FunctionResultItem(
@@ -148,7 +148,7 @@ def test_generation_mapper_replays_tool_use_and_tool_result_as_messages() -> Non
                     "type": "tool_use",
                     "id": "toolu_1",
                     "name": "lookup",
-                    "input": {"query": "vatbrain"},
+                    "input": {"query": "aiflect"},
                 }
             ],
         },

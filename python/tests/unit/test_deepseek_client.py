@@ -4,17 +4,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     ClientConfig,
     GenerationConfig,
     MessageItem,
     RemoteContextHint,
     SecretString,
 )
-from whero.vatbrain.core.errors import ProviderRequestError
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.providers.deepseek import DeepSeekClient
-from whero.vatbrain.providers.deepseek.client import DEFAULT_ANTHROPIC_BASE_URL
+from whero.aiflect.core.errors import ProviderRequestError
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.providers.deepseek import DeepSeekClient
+from whero.aiflect.providers.deepseek.client import DEFAULT_ANTHROPIC_BASE_URL
 
 
 class FakeMessages:

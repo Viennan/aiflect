@@ -121,7 +121,7 @@ Model entries use:
   `premium`, `legacy`, or `experimental`.
 - `enabled`: whether the runner may select the model.
 - `capabilities`: model capability overrides for both test selection and
-  `vatbrain` client construction.
+  `aiflect` client construction.
 
 `capabilities` keys should match `ModelCapability` field names where possible,
 for example `supports_streaming`, `supports_tools`,

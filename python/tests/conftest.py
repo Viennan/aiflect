@@ -198,7 +198,7 @@ def costly_client(costly_model_case: CostlyModelCase) -> Any:
 
     if costly_model_case.provider == "openai":
         pytest.importorskip("openai", reason="OpenAI costly tests require the openai package")
-        from whero.vatbrain.providers.openai import OpenAIClient
+        from whero.aiflect.providers.openai import OpenAIClient
 
         return OpenAIClient(**client_options)
     if costly_model_case.provider == "volcengine":
@@ -206,17 +206,17 @@ def costly_client(costly_model_case: CostlyModelCase) -> Any:
             "volcenginesdkarkruntime",
             reason="Volcengine costly tests require python[volcengine]",
         )
-        from whero.vatbrain.providers.volcengine import VolcengineClient
+        from whero.aiflect.providers.volcengine import VolcengineClient
 
         return VolcengineClient(**client_options)
     if costly_model_case.provider == "anthropic":
         pytest.importorskip("anthropic", reason="Anthropic costly tests require python[anthropic]")
-        from whero.vatbrain.providers.anthropic import AnthropicClient
+        from whero.aiflect.providers.anthropic import AnthropicClient
 
         return AnthropicClient(**client_options)
     if costly_model_case.provider == "deepseek":
         pytest.importorskip("anthropic", reason="DeepSeek costly tests require python[deepseek]")
-        from whero.vatbrain.providers.deepseek import DeepSeekClient
+        from whero.aiflect.providers.deepseek import DeepSeekClient
 
         return DeepSeekClient(**client_options)
     pytest.skip(f"unsupported costly provider: {costly_model_case.provider}")

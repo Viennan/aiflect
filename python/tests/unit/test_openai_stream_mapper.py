@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from whero.vatbrain import FunctionToolType, GenerationStreamAccumulator, MessageItem, TextPart
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.core.items import FunctionCallItem
-from whero.vatbrain.providers.openai.stream import from_openai_stream_event
+from whero.aiflect import FunctionToolType, GenerationStreamAccumulator, MessageItem, TextPart
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.core.items import FunctionCallItem
+from whero.aiflect.providers.openai.stream import from_openai_stream_event
 
 
 def test_stream_text_delta_maps_to_item_delta() -> None:

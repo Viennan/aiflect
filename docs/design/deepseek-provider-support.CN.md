@@ -5,13 +5,13 @@
 
 ## 背景
 
-DeepSeek 提供 Anthropic 兼容接口和 OpenAI completion 兼容接口。`vatbrain` 当前以 provider adapter 隐藏不同厂商的调用差异，DeepSeek provider 应把两种兼容形态纳入同一个 client 初始化模型，但首期只实现 Anthropic 兼容接口，避免一次性引入两个 transport family。
+DeepSeek 提供 Anthropic 兼容接口和 OpenAI completion 兼容接口。`aiflect` 当前以 provider adapter 隐藏不同厂商的调用差异，DeepSeek provider 应把两种兼容形态纳入同一个 client 初始化模型，但首期只实现 Anthropic 兼容接口，避免一次性引入两个 transport family。
 
 相关需求记录见 [REQ-2026-06-python-deepseek-provider.CN.md](../requirements/REQ-2026-06-python-deepseek-provider.CN.md)，Python 实现记录见 [deepseek-adapter.CN.md](../impls/python/deepseek-adapter.CN.md)。
 
 ## Design Philosophy
 
-DeepSeek adapter 的设计优先级是：保留 `vatbrain` 的 Full-context First 编程模型，复用已验证的 Messages API 映射经验，显式暴露 DeepSeek 兼容接口的能力边界。DeepSeek 官方兼容层对 Anthropic 参数不是完全等价，因此 adapter 不能简单复制 Anthropic provider；凡是 DeepSeek 会忽略且用户可能误以为生效的控制项，应在通用字段层提前拒绝或降级为无 transport effect 的兼容 hint。
+DeepSeek adapter 的设计优先级是：保留 `aiflect` 的 Full-context First 编程模型，复用已验证的 Messages API 映射经验，显式暴露 DeepSeek 兼容接口的能力边界。DeepSeek 官方兼容层对 Anthropic 参数不是完全等价，因此 adapter 不能简单复制 Anthropic provider；凡是 DeepSeek 会忽略且用户可能误以为生效的控制项，应在通用字段层提前拒绝或降级为无 transport effect 的兼容 hint。
 
 ## Module Responsibilities
 

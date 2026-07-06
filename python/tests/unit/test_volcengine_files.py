@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import FilePreprocessConfig, FileStatus, FileUploadRequest
-from whero.vatbrain.core.errors import UnsupportedCapabilityError
-from whero.vatbrain.providers.volcengine.files import (
+from whero.aiflect import FilePreprocessConfig, FileStatus, FileUploadRequest
+from whero.aiflect.core.errors import UnsupportedCapabilityError
+from whero.aiflect.providers.volcengine.files import (
     from_volcengine_file_delete_response,
     from_volcengine_file_resource,
     to_volcengine_file_create_params,

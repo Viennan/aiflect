@@ -5,16 +5,16 @@ from types import SimpleNamespace
 import pytest
 from pydantic import BaseModel
 
-from whero.vatbrain import (
+from whero.aiflect import (
     ClientConfig,
     GenerationConfig,
     MessageItem,
     RemoteContextHint,
     SecretString,
 )
-from whero.vatbrain.core.errors import ProviderRequestError
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.providers.anthropic import AnthropicClient
+from whero.aiflect.core.errors import ProviderRequestError
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.providers.anthropic import AnthropicClient
 
 
 class FakeMessages:

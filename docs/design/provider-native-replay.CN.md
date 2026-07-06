@@ -6,7 +6,7 @@
 
 ## 背景
 
-`vatbrain` 坚持 Full-context First：一次 generation 调用的语义事实来源应是用户传入的完整 `Item` 序列。provider 的 `previous_response_id`、cache、stored response 或 conversation state 只能作为优化提示，不能成为唯一上下文来源。`RemoteContextHint` 表达是否启用 provider-side cache、可选的多轮 session/cache pool 标识，以及完整 `items` 中新增 item 的起始位置。
+`aiflect` 坚持 Full-context First：一次 generation 调用的语义事实来源应是用户传入的完整 `Item` 序列。provider 的 `previous_response_id`、cache、stored response 或 conversation state 只能作为优化提示，不能成为唯一上下文来源。`RemoteContextHint` 表达是否启用 provider-side cache、可选的多轮 session/cache pool 标识，以及完整 `items` 中新增 item 的起始位置。
 
 但不同 provider 的 Responses 风格 API 往往会在 input/output item 上携带对重放很关键的原生字段。OpenAI Responses API 的 assistant message `phase` 就是一个典型例子。它区分 `commentary` 与 `final_answer` 阶段；在 follow-up/replay 时丢失该字段，可能导致模型错误判断历史消息阶段，甚至提前终止。
 
@@ -16,9 +16,9 @@
 
 ### Full-context First 不变
 
-provider-native replay 不改变 `vatbrain` 的语义模型。用户仍应传入完整上下文；provider response id 失效时，完整上下文仍是 refresh 的事实来源。
+provider-native replay 不改变 `aiflect` 的语义模型。用户仍应传入完整上下文；provider response id 失效时，完整上下文仍是 refresh 的事实来源。
 
-provider-native replay 只解决“同 provider 同 API family 下如何尽量保留原生 item 信息”的问题。它不是 provider conversation，也不意味着 `vatbrain` 持有远端会话真值。
+provider-native replay 只解决“同 provider 同 API family 下如何尽量保留原生 item 信息”的问题。它不是 provider conversation，也不意味着 `aiflect` 持有远端会话真值。
 
 ### Semantic Full Context, Transport Delta
 
@@ -257,7 +257,7 @@ MessageItem.assistant_phase: AssistantMessagePhase | str | None
 
 ### 为什么不把 items 拆成 history_items 和 append_items？
 
-`vatbrain` 的核心编程模型要求用户传入完整语义上下文。如果在 `GenerationRequest` 顶层拆成 history/append，用户很容易误以为 history 可以省略或由 provider 维护。覆盖边界应作为 `RemoteContextHint` 中相对某个 previous response id 的事实表达，由 adapter 从完整 `items` 计算传输 suffix。
+`aiflect` 的核心编程模型要求用户传入完整语义上下文。如果在 `GenerationRequest` 顶层拆成 history/append，用户很容易误以为 history 可以省略或由 provider 维护。覆盖边界应作为 `RemoteContextHint` 中相对某个 previous response id 的事实表达，由 adapter 从完整 `items` 计算传输 suffix。
 
 ## 参考资料
 

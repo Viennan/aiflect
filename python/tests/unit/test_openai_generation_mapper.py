@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     AssistantMessagePhase,
     FunctionResultItem,
     FunctionToolType,
@@ -25,9 +25,9 @@ from whero.vatbrain import (
     ToolSpec,
     VideoPart,
 )
-from whero.vatbrain.core.errors import InvalidItemError, ProviderResponseMappingError, UnsupportedCapabilityError
-from whero.vatbrain.core.items import FunctionCallItem
-from whero.vatbrain.providers.openai.mapper import (
+from whero.aiflect.core.errors import InvalidItemError, ProviderResponseMappingError, UnsupportedCapabilityError
+from whero.aiflect.core.items import FunctionCallItem
+from whero.aiflect.providers.openai.mapper import (
     from_openai_generation_response,
     to_openai_generation_params,
 )

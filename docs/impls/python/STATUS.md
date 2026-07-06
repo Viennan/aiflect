@@ -1,8 +1,8 @@
 # Python 实现状态
 
-状态：v0.8 Session cache 策略已完成
+状态：v0.9 Package rename 已完成
 日期：2026-06-12
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## 定位
 
@@ -10,7 +10,7 @@
 
 ## 当前基线
 
-Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session cache 策略：在既有 OpenAI、Volcengine、Anthropic 与 DeepSeek provider 基线上，扩展 `RemoteContextHint.session_key`，并将其映射为 OpenAI `prompt_cache_key`、Volcengine adapter-managed Responses API Session cache。Anthropic 与 DeepSeek 兼容接收该字段但首期不下发。
+Python 是 `aiflect` 的参考实现语言。当前实现已完成 v0.9 Package rename：公开 import 路径为 `whero.aiflect`，distribution name 为 `whero-aiflect`，源码目录为 `python/whero/aiflect`。在此基础上保留 v0.8 Session cache 策略能力：OpenAI 将 `RemoteContextHint.session_key` 映射为 `prompt_cache_key`，Volcengine 映射为 adapter-managed Responses API Session cache，Anthropic 与 DeepSeek 兼容接收该字段但首期不下发。
 
 核心文档：
 
@@ -23,6 +23,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 - [deepseek-adapter.CN.md](deepseek-adapter.CN.md)
 - [remote-context-cache-strategy.CN.md](remote-context-cache-strategy.CN.md)
 - [session-cache-strategy.CN.md](session-cache-strategy.CN.md)
+- [package-rename-aiflect.CN.md](package-rename-aiflect.CN.md)
 - [v0.5-media-generation.CN.md](v0.5-media-generation.CN.md)
 - [v0.2-responses-contract-hardening.CN.md](v0.2-responses-contract-hardening.CN.md)
 - [v0.3-core-api-family-expansion.CN.md](v0.3-core-api-family-expansion.CN.md)
@@ -33,6 +34,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 ### 包与基础设施
 
 - Python 包脚手架与 `pyproject.toml`。
+- Python package name 为 `aiflect`，import 路径为 `whero.aiflect`，distribution name 为 `whero-aiflect`。
 - 通用 client 初始化配置：`ClientConfig`。
 - `SecretString`：provider adapter 用于存储 LLM API key。
 - OpenAI / Volcengine / Anthropic / DeepSeek adapter 不再从环境变量自动读取 API key；需要初始化时显式传入，或通过 `ClientConfig.api_key` 提供。
@@ -121,7 +123,7 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 
 ### Pydantic Structured Output
 
-- Optional helper：`whero-vatbrain[pydantic]`。
+- Optional helper：`whero-aiflect[pydantic]`。
 - `pydantic_output()` 从 Pydantic v2 type 生成 `ResponseFormat`。
 - `PydanticOutputSpec.parse_text()` 与 `parse_response()`。
 - `ParsedGenerationResponse.output_parsed`。
@@ -131,8 +133,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 
 ### Volcengine Adapter
 
-- Provider package：`whero.vatbrain.providers.volcengine`。
-- Optional dependency：`whero-vatbrain[volcengine]`，使用 `volcengine-python-sdk[ark]>=5.0.30,<6`。
+- Provider package：`whero.aiflect.providers.volcengine`。
+- Optional dependency：`whero-aiflect[volcengine]`，使用 `volcengine-python-sdk[ark]>=5.0.30,<6`。
 - Client：`VolcengineClient`。
 - LLM API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
 - 严格使用 Ark SDK 原生 surface：
@@ -191,8 +193,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 
 ### Anthropic Adapter
 
-- Provider package：`whero.vatbrain.providers.anthropic`。
-- Optional dependency：`whero-vatbrain[anthropic]`，使用 `anthropic>=0.105.2,<1`。
+- Provider package：`whero.aiflect.providers.anthropic`。
+- Optional dependency：`whero-aiflect[anthropic]`，使用 `anthropic>=0.105.2,<1`。
 - Client：`AnthropicClient`。
 - API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
 - 严格使用官方 Anthropic SDK 原生 surface：
@@ -234,8 +236,8 @@ Python 是 `vatbrain` 的参考实现语言。当前实现已完成 v0.8 Session
 
 ### DeepSeek Adapter
 
-- Provider package：`whero.vatbrain.providers.deepseek`。
-- Optional dependency：`whero-vatbrain[deepseek]`，使用 `anthropic>=0.105.2,<1` 访问 DeepSeek Anthropic-compatible endpoint。
+- Provider package：`whero.aiflect.providers.deepseek`。
+- Optional dependency：`whero-aiflect[deepseek]`，使用 `anthropic>=0.105.2,<1` 访问 DeepSeek Anthropic-compatible endpoint。
 - Client：`DeepSeekClient`。
 - API key 必须在初始化时显式传入；adapter 内部以 `SecretString` 保存。
 - 初始化参数新增 `api_format`：

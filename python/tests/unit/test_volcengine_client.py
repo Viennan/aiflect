@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from whero.vatbrain import (
+from whero.aiflect import (
     ClientConfig,
     FilePreprocessConfig,
     FileStatus,
@@ -20,9 +20,9 @@ from whero.vatbrain import (
     TaskStatus,
     VideoPart,
 )
-from whero.vatbrain.core.errors import ProviderRequestError
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.providers.volcengine import VolcengineClient
+from whero.aiflect.core.errors import ProviderRequestError
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.providers.volcengine import VolcengineClient
 
 
 class FakeResponses:
@@ -406,7 +406,7 @@ def test_client_generate_refreshes_invalid_remote_context() -> None:
 
 
 def test_client_generate_uses_session_cache_params(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.time", lambda: 1_800_000_000)
+    monkeypatch.setattr("whero.aiflect.providers.volcengine.client.time.time", lambda: 1_800_000_000)
     fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
     client = VolcengineClient(client=fake, async_client=object())
 
@@ -441,7 +441,7 @@ def test_client_generate_uses_session_cache_params(monkeypatch: pytest.MonkeyPat
 
 
 def test_client_generate_refreshes_session_cache_before_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.time", lambda: 1_800_000_000)
+    monkeypatch.setattr("whero.aiflect.providers.volcengine.client.time.time", lambda: 1_800_000_000)
     fake = FakeArk(response=_raw_response(), embedding=_raw_embedding(), file_obj=_raw_file())
     client = VolcengineClient(client=fake, async_client=object())
 
@@ -685,7 +685,7 @@ def test_client_wait_for_video_generation_task_polls_until_terminal(monkeypatch:
         ],
     )
     client = VolcengineClient(client=fake, async_client=object())
-    monkeypatch.setattr("whero.vatbrain.providers.volcengine.client.time.sleep", lambda _: None)
+    monkeypatch.setattr("whero.aiflect.providers.volcengine.client.time.sleep", lambda _: None)
 
     task = client.wait_for_video_generation_task("task_1", poll_interval=0.1, max_wait_seconds=5)
 
@@ -848,10 +848,10 @@ def test_client_common_init_options_are_collected() -> None:
     assert repr(client._client_options["api_key"]) == "SecretString('********')"
 
 
-def test_client_does_not_read_provider_scoped_vatbrain_env_api_key(
+def test_client_does_not_read_provider_scoped_aiflect_env_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("ENV_VATBRAIN_VOLCENGINE_API_KEY", "env-key")
+    monkeypatch.setenv("ENV_AIFLECT_VOLCENGINE_API_KEY", "env-key")
 
     with pytest.raises(ValueError, match="requires api_key"):
         VolcengineClient()

@@ -6,7 +6,7 @@
 
 ## 定位
 
-本文是 DeepSeek 官方 Anthropic API 兼容说明的本地摘录，用于 `vatbrain` DeepSeek adapter 的设计与实现参考。产品语义仍以 [deepseek-provider-support.CN.md](../../design/deepseek-provider-support.CN.md) 和 [deepseek-adapter.CN.md](../../impls/python/deepseek-adapter.CN.md) 为准。
+本文是 DeepSeek 官方 Anthropic API 兼容说明的本地摘录，用于 `aiflect` DeepSeek adapter 的设计与实现参考。产品语义仍以 [deepseek-provider-support.CN.md](../../design/deepseek-provider-support.CN.md) 和 [deepseek-adapter.CN.md](../../impls/python/deepseek-adapter.CN.md) 为准。
 
 ## 关键信息
 
@@ -20,7 +20,7 @@
 - `output_config` 当前只支持 `effort`，可用值以官方文档为准；当前摘录用于实现的值为 `high` 和 `max`。
 - Anthropic structured output 的 `output_config.format` 不在 DeepSeek 兼容支持范围内。
 
-## 对 vatbrain 的实现约束
+## 对 aiflect 的实现约束
 
 - DeepSeek provider 的首个实现使用 Anthropic 兼容 Messages API。
 - `ResponseFormat` 不映射到 `output_config.format`，而是提前抛 `UnsupportedCapabilityError`。

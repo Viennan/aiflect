@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 from pydantic import BaseModel
 
-from whero.vatbrain import (
+from whero.aiflect import (
     ClientConfig,
     ImagePart,
     MessageItem,
@@ -18,9 +18,9 @@ from whero.vatbrain import (
     SecretString,
     ToolCallConfig,
 )
-from whero.vatbrain.core.errors import ProviderRequestError, UnsupportedCapabilityError
-from whero.vatbrain.core.generation import StreamEventType
-from whero.vatbrain.providers.openai import OpenAIClient
+from whero.aiflect.core.errors import ProviderRequestError, UnsupportedCapabilityError
+from whero.aiflect.core.generation import StreamEventType
+from whero.aiflect.providers.openai import OpenAIClient
 
 
 class FakeResponses:
@@ -664,8 +664,8 @@ def test_client_common_init_options_are_collected() -> None:
     assert repr(client._client_options["api_key"]) == "SecretString('********')"
 
 
-def test_client_does_not_read_provider_scoped_vatbrain_env_api_key(monkeypatch) -> None:
-    monkeypatch.setenv("ENV_VATBRAIN_OPENAI_API_KEY", "env-key")
+def test_client_does_not_read_provider_scoped_aiflect_env_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("ENV_AIFLECT_OPENAI_API_KEY", "env-key")
 
     with pytest.raises(ValueError, match="requires api_key"):
         OpenAIClient()

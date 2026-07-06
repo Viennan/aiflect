@@ -1,8 +1,8 @@
 # Python 用户文档状态
 
-状态：v0.8 Session cache 文档已补充
+状态：v0.9 Package rename 文档已补充
 日期：2026-06-12
-最近更新：2026-06-12
+最近更新：2026-07-06
 
 ## 当前文档
 
@@ -15,6 +15,11 @@
 
 ## 已覆盖
 
+- Package rename：
+  - 安装依赖名为 `whero-aiflect`。
+  - 用户 import 路径为 `whero.aiflect`。
+  - 错误基类为 `AiflectError`。
+  - 项目环境变量前缀为 `AIFLECT` / `ENV_AIFLECT_`。
 - OpenAI provider client：
   - 初始化。
   - 显式凭据初始化与 SecretString 存储。
@@ -25,7 +30,7 @@
   - `RemoteContextHint.session_key` 映射为 Responses API `prompt_cache_key`。
   - capability 查询。
 - Volcengine provider client：
-  - `whero-vatbrain[volcengine]` optional dependency。
+  - `whero-aiflect[volcengine]` optional dependency。
   - 显式凭据初始化与 SecretString 存储。
   - Ark SDK-only 调用边界。
   - 同步/异步 generation 与 streaming。
@@ -41,7 +46,7 @@
   - `RemoteContextHint.session_key` 对应的 Responses API Session cache、固定 1 小时生命周期与过期前 full refresh。
   - capability 查询。
 - Anthropic provider client：
-  - `whero-vatbrain[anthropic]` optional dependency。
+  - `whero-aiflect[anthropic]` optional dependency。
   - 显式凭据初始化与 SecretString 存储。
   - 官方 Anthropic SDK Messages API 调用边界。
   - 同步/异步 generation 与 streaming。
@@ -57,7 +62,7 @@
   - usage cache/reasoning token 映射。
   - capability 查询。
 - DeepSeek provider client：
-  - `whero-vatbrain[deepseek]` optional dependency。
+  - `whero-aiflect[deepseek]` optional dependency。
   - 显式凭据初始化与 SecretString 存储。
   - Anthropic-compatible Messages API 调用边界。
   - `api_format="anthropic"` 已实现，`api_format="openai_completion"` 预留但未实现。

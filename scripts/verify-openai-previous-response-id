@@ -15,7 +15,7 @@ from uuid import uuid4
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = REPO_ROOT / "creds.json"
-_CHILD_ENV = "VATBRAIN_OPENAI_PREVIOUS_RESPONSE_ID_CHILD"
+_CHILD_ENV = "AIFLECT_OPENAI_PREVIOUS_RESPONSE_ID_CHILD"
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,7 +228,7 @@ def _confirm() -> bool:
 
 
 def _verify_model(client: Any, case: OpenAIModelCase, *, max_output_tokens: int) -> bool:
-    marker = f"VATBRAIN-PREVIOUS-RESPONSE-{uuid4().hex[:8].upper()}"
+    marker = f"AIFLECT-PREVIOUS-RESPONSE-{uuid4().hex[:8].upper()}"
     print(f"Verifying model={case.model_id} profile={case.profile}", flush=True)
     print("  creating first stored response...", flush=True)
     try:

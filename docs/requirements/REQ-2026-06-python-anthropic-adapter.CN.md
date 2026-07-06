@@ -6,7 +6,7 @@
 
 ## 背景
 
-`vatbrain` 当前 Python 参考实现已支持 OpenAI 与 Volcengine provider。Anthropic Claude Messages API 与 `vatbrain` 的 full-context generation、user-executed tools、streaming event 和 cache/usage 抽象存在较高契合度，但它没有 OpenAI/Volcengine Responses API 的 `previous_response_id` 差分上下文语义。
+`aiflect` 当前 Python 参考实现已支持 OpenAI 与 Volcengine provider。Anthropic Claude Messages API 与 `aiflect` 的 full-context generation、user-executed tools、streaming event 和 cache/usage 抽象存在较高契合度，但它没有 OpenAI/Volcengine Responses API 的 `previous_response_id` 差分上下文语义。
 
 本需求记录 Anthropic provider adapter 的范围、状态和后续落地入口。详细设计见 [anthropic-provider-support.CN.md](../design/anthropic-provider-support.CN.md)，Python 实现计划见 [anthropic-adapter.CN.md](../impls/python/anthropic-adapter.CN.md)。
 
@@ -19,8 +19,8 @@
 
 ## 范围
 
-- 新增 `whero.vatbrain.providers.anthropic` provider package。
-- 新增 optional dependency：`whero-vatbrain[anthropic]`。
+- 新增 `whero.aiflect.providers.anthropic` provider package。
+- 新增 optional dependency：`whero-aiflect[anthropic]`。
 - 使用官方 Anthropic Python SDK 的 `Anthropic` / `AsyncAnthropic` 与 `messages.create`。
 - 支持文本与图片输入、多轮消息、function tool、tool use / tool result 回填、streaming event 映射、usage/cache token 映射和 adapter/model capability。
 - 保留 provider-native snapshot，用于同 provider/API family 下的高保真重放。

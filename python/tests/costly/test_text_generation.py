@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from whero.vatbrain import (
+from whero.aiflect import (
     GenerationConfig,
     GenerationStreamAccumulator,
     ImagePart,
@@ -15,14 +15,14 @@ from whero.vatbrain import (
     TextPart,
     provider_response_id_for,
 )
-from whero.vatbrain.core.errors import ProviderRequestError
-from whero.vatbrain.core.generation import StreamEventType
+from whero.aiflect.core.errors import ProviderRequestError
+from whero.aiflect.core.generation import StreamEventType
 
 
 pytestmark = pytest.mark.costly
 _SMOKE_TOKEN = "VBTOKEN42"
-_CACHE_MARKER = "VATBRAIN-CACHE-42"
-_CACHE_SESSION_KEY = "vatbrain-costly-cache-session"
+_CACHE_MARKER = "AIFLECT-CACHE-42"
+_CACHE_SESSION_KEY = "aiflect-costly-cache-session"
 _STRUCTURED_CODE = "ALPHA42"
 _REASONING_MAX_OUTPUT_TOKENS = 2048
 
