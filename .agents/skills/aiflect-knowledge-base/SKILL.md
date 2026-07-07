@@ -1,9 +1,17 @@
 ---
 name: aiflect-knowledge-base
-description: Use when reading, maintaining, or reconciling the aiflect knowledge base under docs; when the user requests design mode; when requirements, design records, implementation notes, user docs, third-party references, or public-behavior documentation may need to be created or updated.
+description: Use when reading, using, maintaining, or reconciling the aiflect docs knowledge base; when requirements, design records, implementation notes, user docs, third-party references, public-behavior documentation, or docs/code consistency matter. For architecture, design repair, deep-design, or Plan-mode style work, pair with aiflect-design.
 ---
 
 # Aiflect Knowledge Base
+
+## Purpose
+
+Use this skill for the `docs` knowledge base as both a source of product
+understanding and a set of maintained documents. The knowledge base exists to
+capture information that code alone cannot express: design philosophy,
+tradeoffs, historical reasoning, user-facing intent, implementation progress,
+and medium- or long-term planning.
 
 ## Entry Points
 
@@ -17,10 +25,28 @@ description: Use when reading, maintaining, or reconciling the aiflect knowledge
 - Treat `docs/3rds` as third-party fact sources, not direct product design
   commitments.
 
+## Using the Knowledge Base
+
+- Use `docs` together with current code and tests when designing architecture,
+  shaping a solution, explaining why an implementation looks the way it does, or
+  judging whether a change fits the product direction.
+- Treat code as the objective record of implemented behavior.
+- Treat `docs` as the record of reasoning above the code: why a path was chosen,
+  what alternatives were considered, what redundancy may be intentional, how the
+  developer tends to reason, and which future plans may constrain today's work.
+- Verify factual implementation claims in `docs` against the current code before
+  relying on them.
+- If `docs` and code conflict, report the conflict and do not choose a new
+  product direction without user authorization.
+- Reading `docs` does not by itself authorize editing `docs`; keep write access
+  governed by the current request, accepted design scope, or explicit user
+  permission.
+
 ## Maintenance Workflow
 
 1. Confirm the user request includes documentation work or that the user has
-   granted permission to modify `docs`.
+   granted permission to modify `docs`, or that an accepted design or
+   implementation scope requires a focused docs update.
 2. Read `docs/INDEX.md` and the smallest relevant set of knowledge-base files.
 3. Compare the documents with current code when reviewing or updating design and
    implementation claims.
@@ -63,8 +89,10 @@ Each language-specific variant under `docs/impls` or `docs/user` may use its own
   implementation mechanics.
 - When the user agrees to modify product design, synchronously update the
   relevant design documents.
-- When organizing content discussed in `design mode`, preserve reference links
-  and compile the user's questions into an FAQ.
+- For deep-design or Plan-mode style work, load `$aiflect-design` to guide the
+  design process, then use this skill to read or update the relevant docs.
+- When organizing design discussions into docs, preserve useful reference links
+  and compile the user's questions into an FAQ when that helps future readers.
 
 ## Implementation and User Documents
 
@@ -83,19 +111,3 @@ Each language-specific variant under `docs/impls` or `docs/user` may use its own
 - Prefer the target filename as link text.
 - Add the minimal directory prefix only when needed to distinguish duplicate
   filenames, such as `impls/python/STATUS.md` and `user/python/STATUS.md`.
-
-## Design Mode
-
-When the user asks to enter `design mode`:
-
-- Treat the session as exploratory architecture and product research.
-- Integrate current product design and code architecture before proposing
-  changes.
-- Focus on systematic design advancement, module semantics, responsibilities,
-  and tradeoffs.
-- Prefer a research-report shape with high-level guidance over low-level
-  implementation detail.
-- Cite authoritative sources when external references are necessary.
-- If a proposal would change core processes, page structure, product
-  positioning, or public API direction, pause and ask for confirmation before
-  editing documents or code.

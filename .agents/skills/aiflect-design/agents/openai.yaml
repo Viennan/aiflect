@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aiflect Design"
+  short_description: "Design aiflect architecture and plans"
+  default_prompt: "Use $aiflect-design to design a scoped aiflect architecture change, using deep-design when the problem is large or complex."

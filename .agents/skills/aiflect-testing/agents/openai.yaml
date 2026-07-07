@@ -1,4 +1,4 @@
 interface:
   display_name: "Aiflect Testing"
-  short_description: "Run unit and costly aiflect tests"
-  default_prompt: "Use $aiflect-testing to add, run, or diagnose aiflect tests."
+  short_description: "Test aiflect with coverage rules"
+  default_prompt: "Use $aiflect-testing to add, run, or diagnose aiflect tests with coverage-aware assertions."
