@@ -32,9 +32,11 @@ def test_message_item_accepts_string_parts() -> None:
 def test_message_item_accepts_assistant_phase() -> None:
     item = MessageItem.assistant("working", assistant_phase="commentary")
 
+    assert item.role == Role.ASSISTANT
+    assert item.parts == (TextPart("working"),)
     assert item.assistant_phase == AssistantMessagePhase.COMMENTARY
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="assistant_phase"):
         MessageItem(Role.USER, "hello", assistant_phase=AssistantMessagePhase.FINAL_ANSWER)
 
 
@@ -68,10 +70,10 @@ def test_provider_response_id_reads_snapshot_metadata() -> None:
 
 
 def test_image_part_requires_exactly_one_source() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires exactly one"):
         ImagePart()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires exactly one"):
         ImagePart(url="https://example.test/a.png", data="abc")
 
     part = ImagePart(url="https://example.test/a.png", metadata={"role": "first_frame"})
@@ -82,10 +84,10 @@ def test_image_part_requires_exactly_one_source() -> None:
 
 @pytest.mark.parametrize("part_cls", [AudioPart, VideoPart, FilePart])
 def test_media_and_file_parts_require_exactly_one_source(part_cls: type[object]) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires one"):
         part_cls()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires exactly one"):
         part_cls(url="https://example.test/a", data="abc")
 
     part = part_cls(local_path="/tmp/example.bin")
@@ -130,7 +132,9 @@ def test_reasoning_item_defaults_to_not_replayable() -> None:
     item = ReasoningItem(summary="short reasoning", provider="openai")
 
     assert item.kind == ItemKind.REASONING
+    assert item.summary == "short reasoning"
+    assert item.provider == "openai"
     assert item.can_be_replayed is False
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires text, summary, or raw"):
         ReasoningItem()

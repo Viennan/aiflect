@@ -500,7 +500,13 @@ def test_anthropic_mapper_replays_provider_native_snapshot() -> None:
         id="msg_1",
         model="claude-test",
         stop_reason="end_turn",
-        content=[SimpleNamespace(type="text", text="hello")],
+        content=[
+            SimpleNamespace(
+                type="text",
+                text="hello",
+                cache_control={"type": "ephemeral"},
+            )
+        ],
         usage=None,
     )
     mapped = from_anthropic_generation_response(response)
@@ -514,5 +520,14 @@ def test_anthropic_mapper_replays_provider_native_snapshot() -> None:
     )
 
     assert params["messages"] == [
-        {"role": "assistant", "content": [{"type": "text", "text": "hello"}]}
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "hello",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+        }
     ]

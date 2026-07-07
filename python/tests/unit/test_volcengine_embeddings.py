@@ -61,7 +61,12 @@ def test_embedding_request_maps_text_sparse_embedding() -> None:
 
     params = to_volcengine_embedding_params(request)
 
-    assert params["sparse_embedding"] == {"type": "enabled"}
+    assert params == {
+        "model": "doubao-embedding-vision-test",
+        "input": [{"type": "text", "text": "hello"}],
+        "encoding_format": "float",
+        "sparse_embedding": {"type": "enabled"},
+    }
 
 
 def test_embedding_request_rejects_batch_video_file_id_and_sparse_multimodal() -> None:

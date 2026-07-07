@@ -597,9 +597,13 @@ def test_client_generate_image_defaults_to_watermark() -> None:
     )
     client = VolcengineClient(client=fake, async_client=object())
 
-    client.generate_image(model="doubao-image-test", prompt="a small robot")
+    response = client.generate_image(model="doubao-image-test", prompt="a small robot")
 
-    assert fake.images.calls[0]["watermark"] is True
+    call = fake.images.calls[0]
+    assert call["model"] == "doubao-image-test"
+    assert call["prompt"] == "a small robot"
+    assert call["watermark"] is True
+    assert response.artifacts[0].url == "https://example.test/image.png"
 
 
 def test_client_video_generation_task_methods_use_ark_content_generation() -> None:
@@ -702,12 +706,17 @@ def test_client_create_video_generation_task_defaults_to_watermark() -> None:
     )
     client = VolcengineClient(client=fake, async_client=object())
 
-    client.create_video_generation_task(
+    created = client.create_video_generation_task(
         model="doubao-video-test",
         prompt="a robot walks",
     )
 
-    assert fake.content_generation.tasks.create_calls[0]["watermark"] is True
+    call = fake.content_generation.tasks.create_calls[0]
+    assert created.id == "task_1"
+    assert created.status == TaskStatus.QUEUED
+    assert call["model"] == "doubao-video-test"
+    assert call["content"] == [{"type": "text", "text": "a robot walks"}]
+    assert call["watermark"] is True
 
 
 @pytest.mark.anyio
@@ -873,6 +882,9 @@ def test_client_reveals_secret_string_only_when_creating_sdk_client(
     )
 
     assert client._client_options["api_key"] == SecretString("explicit")
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
+    ark_cls.assert_not_called()
+    async_ark_cls.assert_not_called()
 
     _ = client._sync_client
     _ = client._async_ark_client
@@ -881,10 +893,30 @@ def test_client_reveals_secret_string_only_when_creating_sdk_client(
     async_ark_cls.assert_called_once_with(api_key="explicit", region="cn-beijing")
 
 
-def test_client_config_api_key_satisfies_explicit_credential_requirement() -> None:
-    client = VolcengineClient(config=ClientConfig(api_key="from-config"))
+def test_client_config_api_key_satisfies_explicit_credential_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ark_cls = Mock(return_value=object())
+    async_ark_cls = Mock(return_value=object())
+    monkeypatch.setitem(
+        sys.modules,
+        "volcenginesdkarkruntime",
+        SimpleNamespace(Ark=ark_cls, AsyncArk=async_ark_cls),
+    )
+
+    client = VolcengineClient(
+        config=ClientConfig(api_key="from-config"),
+        region="cn-beijing",
+    )
 
     assert client._client_options["api_key"] == SecretString("from-config")
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
+
+    _ = client._sync_client
+    _ = client._async_ark_client
+
+    ark_cls.assert_called_once_with(api_key="from-config", region="cn-beijing")
+    async_ark_cls.assert_called_once_with(api_key="from-config", region="cn-beijing")
 
 
 def test_client_request_error_is_wrapped_with_provider_details() -> None:

@@ -6,9 +6,15 @@ from whero.aiflect import EmbeddingInput, EmbeddingRequest, EmbeddingVector, Ima
 
 
 def test_embedding_input_accepts_modality() -> None:
-    item = EmbeddingInput([ImagePart(url="https://example.test/a.png")], modality="image")
+    image = ImagePart(url="https://example.test/a.png")
+    metadata = {"source": "fixture"}
 
+    item = EmbeddingInput([image], modality="image", metadata=metadata)
+    metadata["source"] = "mutated"
+
+    assert item.parts == (image,)
     assert item.modality == "image"
+    assert item.metadata == {"source": "fixture"}
 
 
 def test_embedding_request_accepts_instructions_and_sparse_flag() -> None:
@@ -30,7 +36,7 @@ def test_sparse_embedding_validates_shape() -> None:
     assert sparse.values == (0.2, 0.8)
     assert sparse.dimensions == 8
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="same length"):
         SparseEmbedding(indices=[1], values=[0.2, 0.4])
 
 

@@ -46,6 +46,14 @@ cd python
 - Tests must assert objective behavior with deterministic pass/fail criteria.
   A test that only runs code, prints logs, or relies on manual inspection is not
   sufficient.
+- Objective assertion signals must accurately reflect whether the behavior under
+  test is implemented. Cover the behavior's meaningful dimensions, including
+  outputs, state transitions, provider-neutral mapping, metadata, edge cases, and
+  error paths when they are relevant to the requirement.
+- For new requirements, cover the full requirement-relevant behavior surface
+  with default unit tests whenever the current design makes that practical. Do
+  not stop adding tests merely because the overall code coverage threshold is
+  satisfied; coverage is a floor, not a substitute for requirement coverage.
 - As the system grows, refactor and extend test code when needed so coverage
   and assertion quality remain understandable and maintainable.
 

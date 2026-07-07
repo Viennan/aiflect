@@ -14,7 +14,7 @@ from whero.aiflect import (
 
 
 def test_generation_config_does_not_accept_stop_sequences() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="stop"):
         GenerationConfig(stop=["END"])  # type: ignore[call-arg]
 
 
@@ -39,17 +39,17 @@ def test_generation_request_accepts_remote_context_hint() -> None:
 
 
 def test_remote_context_hint_validates_session_key() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="session_key must not be empty"):
         RemoteContextHint(session_key=" ")
 
 
 def test_remote_context_hint_validates_new_items_start_index() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="new_items_start_index must be non-negative"):
         RemoteContextHint(new_items_start_index=-1)
 
 
 def test_generation_request_validates_remote_context_coverage_bounds() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="less than or equal"):
         GenerationRequest(
             model="gpt-test",
             items=[MessageItem.user("hello")],
@@ -74,5 +74,5 @@ def test_replay_policy_normalizes_modes() -> None:
     assert policy.mode == ReplayMode.REQUIRE_PROVIDER_NATIVE
     assert policy.cross_provider == "unsupported"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cross_provider"):
         ReplayPolicy(cross_provider="translate")
