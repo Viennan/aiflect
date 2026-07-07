@@ -740,6 +740,9 @@ def test_client_reveals_secret_string_only_when_creating_sdk_client(
     client = OpenAIClient(api_key=SecretString("explicit"), organization="org_1")
 
     assert client._client_options["api_key"] == SecretString("explicit")
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
+    openai_cls.assert_not_called()
+    async_openai_cls.assert_not_called()
 
     _ = client._sync_client
     _ = client._async_openai_client
@@ -748,10 +751,27 @@ def test_client_reveals_secret_string_only_when_creating_sdk_client(
     async_openai_cls.assert_called_once_with(api_key="explicit", organization="org_1")
 
 
-def test_client_config_api_key_satisfies_explicit_credential_requirement() -> None:
-    client = OpenAIClient(config=ClientConfig(api_key="from-config"))
+def test_client_config_api_key_satisfies_explicit_credential_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    openai_cls = Mock(return_value=object())
+    async_openai_cls = Mock(return_value=object())
+    monkeypatch.setitem(
+        sys.modules,
+        "openai",
+        SimpleNamespace(OpenAI=openai_cls, AsyncOpenAI=async_openai_cls),
+    )
+
+    client = OpenAIClient(config=ClientConfig(api_key="from-config"), organization="org_1")
 
     assert client._client_options["api_key"] == SecretString("from-config")
+    assert repr(client._client_options["api_key"]) == "SecretString('********')"
+
+    _ = client._sync_client
+    _ = client._async_openai_client
+
+    openai_cls.assert_called_once_with(api_key="from-config", organization="org_1")
+    async_openai_cls.assert_called_once_with(api_key="from-config", organization="org_1")
 
 
 def test_client_request_error_is_wrapped_with_provider_details() -> None:

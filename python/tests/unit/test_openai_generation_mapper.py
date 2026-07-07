@@ -164,7 +164,17 @@ def test_assistant_phase_maps_to_openai_message_phase() -> None:
 
     params = to_openai_generation_params(request)
 
-    assert params["input"][0]["phase"] == "commentary"
+    assert params == {
+        "model": "gpt-test",
+        "input": [
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "working"}],
+                "phase": "commentary",
+            }
+        ],
+    }
 
 
 def test_generation_request_maps_remote_context_hint() -> None:
@@ -278,7 +288,18 @@ def test_provider_specific_stream_options_are_passthrough() -> None:
 
     params = to_openai_generation_params(request, stream=True)
 
-    assert params["stream_options"] == {"include_obfuscation": True}
+    assert params == {
+        "model": "gpt-test",
+        "input": [
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hello"}],
+            }
+        ],
+        "stream": True,
+        "stream_options": {"include_obfuscation": True},
+    }
 
 
 def test_provider_options_override_default_params() -> None:
@@ -291,7 +312,17 @@ def test_provider_options_override_default_params() -> None:
 
     params = to_openai_generation_params(request)
 
-    assert params["temperature"] == 0.7
+    assert params == {
+        "model": "gpt-test",
+        "input": [
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "hello"}],
+            }
+        ],
+        "temperature": 0.7,
+    }
 
 
 def test_json_schema_response_format_maps_to_openai_text_format() -> None:

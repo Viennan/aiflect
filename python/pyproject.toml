@@ -27,13 +27,14 @@ volcengine = [
 test = [
     "pydantic>=2,<3",
     "pytest>=8.0",
+    "pytest-cov>=7.0,<8",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["whero"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
 pythonpath = ["."]
 markers = [
     "costly: tests that may call real provider APIs or create billable usage",
