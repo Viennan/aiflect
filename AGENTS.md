@@ -13,12 +13,17 @@ procedures in `.agents/skills` and load the relevant skill before acting on a
 specialized workflow.
 
 - Load `.agents/skills/aiflect-implementation` before implementing, reviewing,
-  or planning non-test code changes.
+  or planning concrete non-test code changes after design direction is settled.
+- Load `.agents/skills/aiflect-design` for aiflect architecture, solution
+  design, design repair, public behavior planning, `deep-design`, or Plan-mode
+  style work. Use `deep-design` when the user requests it or when a large,
+  complex requirement would benefit from unusually deep and systematic design.
 - Load `.agents/skills/aiflect-submission` before committing, pushing,
   submitting to a remote, creating or updating PR/MR, or preparing PR/MR
   descriptions.
-- Load `.agents/skills/aiflect-knowledge-base` before working in `docs`,
-  entering `design mode`, updating requirements, or reconciling design and code.
+- Load `.agents/skills/aiflect-knowledge-base` before working in `docs`, using
+  `docs` as product/design context, updating requirements, or reconciling
+  design and code.
 - Load `.agents/skills/aiflect-testing` before adding, running, or diagnosing
   tests, including costly provider tests.
 - Prefer `rg` and `rg --files` for repository search.
@@ -63,9 +68,9 @@ specialized workflow.
   copyable summary in the final response and use PR/MR-renderable documentation
   links. For GitHub, use full URLs pinned to a commit SHA rather than relative
   paths.
-- Do not modify files under `docs` unless the user request includes that work or
-  the user grants permission. If design documents and code conflict, report the
-  conflict before changing direction.
+- Do not modify files under `docs` outside the current user request, accepted
+  design scope, or explicit user permission. If design documents and code
+  conflict, report the conflict before changing direction.
 
 ## Skill Maintenance
 

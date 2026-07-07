@@ -22,6 +22,33 @@ When adding tests, prefer local fakes, fixtures, and static assertions over live
 provider calls. Tests that require credentials, network access, or billable
 provider usage must be clearly separated from the default unit test suite.
 
+New requirements should have default unit-test coverage whenever the current
+design makes that possible. Do not change the product or code design merely to
+make a unit test easier to write; if the current design makes meaningful unit
+coverage impractical, report the limitation and wait for user direction.
+
+## Coverage and Assertion Standards
+
+- Non-cost default unit tests must maintain at least 80% code coverage for the
+  Python implementation.
+- Prefer measuring coverage for `whero.aiflect` from the default unit-test
+  suite, excluding costly tests.
+- When pytest coverage tooling is available, use an explicit fail-under check
+  such as:
+
+```bash
+cd python
+../.venv/bin/python -m pytest --cov=whero.aiflect --cov-fail-under=80
+```
+
+- If the current tooling cannot measure coverage, report that as a test
+  infrastructure gap instead of treating coverage as satisfied.
+- Tests must assert objective behavior with deterministic pass/fail criteria.
+  A test that only runs code, prints logs, or relies on manual inspection is not
+  sufficient.
+- As the system grows, refactor and extend test code when needed so coverage
+  and assertion quality remain understandable and maintainable.
+
 ## Pytest Layout and Markers
 
 - Place default unit tests under `python/tests/unit`.
